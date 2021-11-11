@@ -12,14 +12,26 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "bin": {
     "ostro": "index.js"
   },
   "engines": {
     "node": ">= 12.0"
   },
+  "keywords": [
+    "http",
+    "nodejs http"
+  ],
+  "author": "amar",
+  "license": "MIT",
+  "main": "file.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ostrojs/installer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ostrojs/installer/issues"
+  },
+  "homepage": "https://github.com/ostrojs/installer#readme",
   "preferGlobal": true
 }
