@@ -1,0 +1,25 @@
+{
+  "name": "@ostro/installer",
+  "version": "1.0.1",
+  "description": "Ostrojs framework installer",
+  "engines": {
+    "node": ">= 12.0"
+  },
+  "dependencies": {
+    "@ostro/support": "^0.0.0-alpha.0",
+    "@ostro/console": "^0.0.0-alpha.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bin": {
+    "ostro": "index.js"
+  },
+  "engines": {
+    "node": ">= 12.0"
+  },
+  "preferGlobal": true
+}
