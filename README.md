@@ -26,12 +26,28 @@
   </h3>
 </div>
 
+## Installation
+You can install the package from npm.
+```bash
+npm i --global @ostro/installer
+```
+
+## Usage
+
+```bash
+ostro new myapp
+
+cd myapp
+
+# start http server
+node app
+```
  
 [javascript-image]: https://img.shields.io/badge/JS-javascript-green
 [javascript-url]:  "javascript"
 
 [nodejs-image]: https://img.shields.io/badge/node-%3E%3D%2012.0.0-green
-[npm-url]: https://npmjs.org/package/@ostrojs/installer "npm"
+[npm-url]: https://npmjs.org/package/@ostro/installer "npm"
 
 [license-image]: https://img.shields.io/github/license/ostrojs/installer
 [license-url]: LICENSE.md "license"
