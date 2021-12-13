@@ -46,7 +46,7 @@ class NewCommand extends Command {
         if (this.input.getOption('force') && $directory === '.') {
             throw new RuntimeException('Cannot use --force option when using current directory for installation!');
         }
-        this.runCommands([`npm update -g @ostro/installer`])
+        this.runCommands([`npm update -g @ostro/installer --silent`])
         this.output.write('[1/7] ')
         this.info('@ostro/installer Updated')
 
