@@ -1,9 +1,8 @@
 const Command = require('@ostro/console/command')
 const child_process = require('child_process')
-const readline = require('readline')
+var readline = require('readline')
 const fs = require('fs')
 const os = require('os')
-const path = require('path')
 class NewCommand extends Command {
 
     $signature = 'new';
@@ -34,6 +33,7 @@ class NewCommand extends Command {
             
              
          </>`);
+
         let $name = this.input.getArgument('name');
 
         let $directory = $name !== '.' ? process.cwd() + path.sep + $name : '.';
@@ -44,17 +44,18 @@ class NewCommand extends Command {
         }
 
         if (this.input.getOption('force') && $directory === '.') {
-            throw new Error('Cannot use --force option when using current directory for installation!');
+            throw new RuntimeException('Cannot use --force option when using current directory for installation!');
         }
+
+          let $currentVersion = this.runCommands(['npm show @ostro/installer version'])
+
+        let $existingVersion = this.runCommands([`npm ls @ostro/installer -g version --depth=0`])
+        $existingVersion = $existingVersion.replace(/[\s\S]*?@ostro\/installer@/gi,'');
         
-        this.output.write('[1/7] @ostro/installer Updating ...')
-        this.runCommands([`npm update -g @ostro/installer --silent`])
-        readline.clearLine(process.stdout, 0)
-        readline.cursorTo(process.stdout, 0, null)
         this.output.write('[1/7] ')
-        this.info('@ostro/installer Updated')
-        
-        this.output.write('[2/7] Creating Directory ...')
+        let versionMessage = $existingVersion == $currentVersion ? '@ostro/installer version verified' : `Update require "npm install @ostro/installer@latest -g"`
+        this.error(versionMessage)
+
         let osType = os.type()
         if ($directory != '.' && this.input.getOption('force')) {
             try {
@@ -64,12 +65,10 @@ class NewCommand extends Command {
             }
         }
         fs.mkdirSync($directory)
-        readline.clearLine(process.stdout, 0)
-        readline.cursorTo(process.stdout, 0, null)
+
         this.output.write('[2/7] ')
         this.info('Directory created')
-        
-        this.output.write('[3/7] Application Crafting ...')
+
         let $url = this.runCommands(['npm v @ostro/ostro dist.tarball'])
         let $commands = [
             `cd ${$directory}`,
@@ -80,18 +79,6 @@ class NewCommand extends Command {
         }
 
         this.runCommands($commands)
-        let packageJson = require($directory+path.sep+'package.json')
-        let freshPackageJson = {}
-        let requireKey = [['name',$name.split('/').pop()],'version',['private',true],'scripts','dependencies','devDependencies',]
-        for(let key of requireKey){
-            if(typeof key == 'string'){
-                freshPackageJson[key] = packageJson[key] 
-            }else{
-                freshPackageJson[key[0]] = key[1]
-            }
-        }
-
-        fs.writeFileSync($directory+path.sep+'package.json',JSON.stringify(freshPackageJson,undefined, 2))
         readline.clearLine(process.stdout, 0)
         readline.cursorTo(process.stdout, 0, null)
         this.output.write('[3/7] ')
@@ -100,17 +87,10 @@ class NewCommand extends Command {
         fs.copyFileSync($directory + path.sep + '.env.example', $directory + path.sep + '.env')
         this.output.write('[4/7] ')
         this.info('Environment file generated')
-       
-        this.output.write('[5/7] Installing Dependencies ...')
-        this.runCommands([`cd ${$directory} && npm install --silent`])
-         readline.clearLine(process.stdout, 0)
-        readline.cursorTo(process.stdout, 0, null)
+
+        this.runCommands([`cd ${$directory} && npm install`])
         this.output.write('[5/7] ')
-        if(fs.existsSync(path.join($directory,'node_modules'))){
-            this.info('Dependencies installed')
-        }else{
-            this.error('Unable to install Dependencies.')
-        }
+        this.info('Dependencies installed')
 
         this.runCommands([`cd ${$directory} && node assistant key:generate`])
         this.output.write('[6/7] ')
@@ -135,10 +115,8 @@ class NewCommand extends Command {
                 $directory + path.sep + '.env.example'
             );
         }
-        
         this.output.write('[7/7] ')
         this.info('Application setup compleated')
-       
         process.stdout.write('\n\n')
         this.output.writeln('<comment>Application ready! Build something amazing.</comment>');
         process.stdout.write('\n')
