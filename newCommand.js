@@ -49,8 +49,8 @@ class NewCommand extends Command {
 
           let $currentVersion = this.runCommands(['npm show @ostro/installer version'])
 
-        let $existingVersion = this.runCommands([`npm ls @ostro/installer -g version --depth=0`])
-        $existingVersion = $existingVersion.replace(/[\s\S]*?@ostro\/installer@/gi,'');
+        let $existingVersion = this.runCommands([`npm ls @ostro/installer -g version --depth=0`]);
+        $existingVersion = ($existingVersion || "").replace(/[\s\S]*?@ostro\/installer@/gi,'');
         
         this.output.write('[1/7] ')
         let versionMessage = $existingVersion == $currentVersion ? '@ostro/installer version verified' : `Update require "npm install @ostro/installer@latest -g"`
