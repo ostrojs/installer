@@ -1,13 +1,13 @@
 {
   "name": "@ostro/installer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "OstroJS framework installer",
   "dependencies": {
-    "@ostro/support": "^0.0.0-alpha",
-    "@ostro/console": "^0.0.0-alpha"
+    "@ostro/support": "^1.0.6",
+    "@ostro/console": "^1.0.0"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No test specified\""
   },
   "engines": {
     "node": ">=12.0.0"
