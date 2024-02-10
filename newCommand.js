@@ -25,7 +25,7 @@ class NewCommand extends Command {
         this.output.writeln(`<fg=cyan> 
                 ___
               /     \\
-             /       \\_____ \_____ ______ \_\__
+             /       \\_____ \_____ _______\_\__
             |        / ___\|   \|   | \'__/  _  \\
             |        \\___ \\   |   | | \|  (_)  \|
              \\       /____\/   |   | |  \\ ___ \/
@@ -47,14 +47,19 @@ class NewCommand extends Command {
             throw new RuntimeException('Cannot use --force option when using current directory for installation!');
         }
 
-          let $currentVersion = this.runCommands(['npm show @ostro/installer version'])
+        let $currentVersion = this.runCommands(['npm show @ostro/installer version']).trim()
 
         let $existingVersion = this.runCommands([`npm ls @ostro/installer -g version --depth=0`]);
-        $existingVersion = ($existingVersion || "").replace(/[\s\S]*?@ostro\/installer@/gi,'');
-        
-        this.output.write('[1/7] ')
+        $existingVersion = ($existingVersion || "").replace(/[^@]*@ostro\/installer@([\d.]+)\s*/, '$1').trim();
+
+        this.output.write('[1/7] ');
         let versionMessage = $existingVersion == $currentVersion ? '@ostro/installer version verified' : `Update require "npm install @ostro/installer@latest -g"`
-        this.error(versionMessage)
+        if ($existingVersion != $currentVersion) {
+            this.error(versionMessage)
+        } else {
+            this.info(versionMessage)
+        }
+
 
         let osType = os.type()
         if ($directory != '.' && this.input.getOption('force')) {
@@ -140,7 +145,7 @@ class NewCommand extends Command {
 
         try {
             return (child_process.execSync($commands.join(' && '), { encoding: 'utf8' }));
-        } catch (e) {}
+        } catch (e) { }
     }
 
     getVersion($input) {
