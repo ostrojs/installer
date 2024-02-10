@@ -1,10 +1,10 @@
 {
   "name": "@ostro/installer",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "OstroJS framework installer",
   "dependencies": {
-    "@ostro/support": "^1.0.6",
-    "@ostro/console": "^1.0.0"
+    "@ostro/support": "^1.2.1",
+    "@ostro/console": "^1.0.5"
   },
   "scripts": {
     "test": "echo \"No test specified\""
