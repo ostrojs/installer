@@ -1,6 +1,6 @@
 {
   "name": "@ostro/installer",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "OstroJS framework installer",
   "dependencies": {
     "@ostro/support": "^1.2.1",
