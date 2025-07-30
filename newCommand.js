@@ -75,14 +75,26 @@ class NewCommand extends Command {
         this.info('Directory created')
 
         let $url = this.runCommands(['npm v @ostro/ostro dist.tarball'])
+        let $commands = [`cd ${$directory}`];
+
         let $commands = [
             `cd ${$directory}`,
-            `curl -s "${$url.trim()}" | tar -xzf - --strip 1`,
         ];
-        if (osType != 'Windows_NT') {
-            $commands.push(`chmod 755 "${$directory}/assistant"`);
+        
+        if (osType === 'Windows_NT') {
+            // Windows-specific commands
+            $commands.push(
+                `curl -s -o ostro.tar.gz "${$url.trim()}"`,
+                `tar -xzf ostro.tar.gz --strip 1`,
+                `del ostro.tar.gz`
+            );
+        } else {
+            // macOS/Linux commands
+            $commands.push(
+                `curl -s "${$url.trim()}" | tar -xzf - --strip 1`,
+                `chmod 755 "${$directory}/assistant"`
+            );
         }
-
         this.runCommands($commands)
         readline.clearLine(process.stdout, 0)
         readline.cursorTo(process.stdout, 0, null)
