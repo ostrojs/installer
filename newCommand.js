@@ -75,21 +75,19 @@ class NewCommand extends Command {
         this.info('Directory created')
 
         let $url = this.runCommands(['npm v @ostro/ostro dist.tarball'])
-        let $commands = [`cd ${$directory}`];
-
         let $commands = [
-            `cd ${$directory}`,
+            `cd ${$directory}`, // shared across platforms
         ];
         
         if (osType === 'Windows_NT') {
-            // Windows-specific commands
+            // Windows PowerShell version using Invoke-WebRequest
             $commands.push(
-                `curl -s -o ostro.tar.gz "${$url.trim()}"`,
+                `powershell -Command "Invoke-WebRequest -Uri '${$url.trim()}' -OutFile 'ostro.tar.gz'"`,
                 `tar -xzf ostro.tar.gz --strip 1`,
-                `del ostro.tar.gz`
+                `powershell -Command "Remove-Item -Force 'ostro.tar.gz'"`
             );
         } else {
-            // macOS/Linux commands
+            // Linux/macOS
             $commands.push(
                 `curl -s "${$url.trim()}" | tar -xzf - --strip 1`,
                 `chmod 755 "${$directory}/assistant"`
