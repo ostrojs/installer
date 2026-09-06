@@ -53,7 +53,10 @@ class NewCommand extends Command {
      * @returns {Promise<void>}
      */
     async handle() {
-        this.output.writeln(`<fg=cyan> 
+        let directoryCreated = false;
+        let $directory = '.';
+        try {
+            this.output.writeln(`<fg=cyan> 
                 ___
               /     \\
              /       \\_____ \_____ _______\_\__
@@ -65,34 +68,32 @@ class NewCommand extends Command {
              
          </>`);
 
-        let $name = this.input.getArgument('name');
-        let $directory = $name !== '.' ? path.resolve(process.cwd(), $name) : '.';
+            let $name = this.input.getArgument('name');
+            $directory = $name !== '.' ? path.resolve(process.cwd(), $name) : '.';
 
-        if (!this.input.getOption('force')) {
-            this.verifyApplicationDoesntExist($directory);
-        }
+            if (!this.input.getOption('force')) {
+                this.verifyApplicationDoesntExist($directory);
+            }
 
-        if (this.input.getOption('force') && $directory === '.') {
-            throw new Error('Cannot use --force option when using current directory for installation!');
-        }
+            if (this.input.getOption('force') && $directory === '.') {
+                throw new Error('Cannot use --force option when using current directory for installation!');
+            }
 
-        let $currentVersion = (this.runCommandsSync(['npm show @ostro/installer version']) || '').trim();
-        let $existingVersion = (this.runCommandsSync(['npm ls @ostro/installer -g version --depth=0']) || '');
-        $existingVersion = $existingVersion.replace(/[^@]*@ostro\/installer@([\d.]+)\s*/, '$1').trim();
+            let $currentVersion = (this.runCommandsSync(['npm show @ostro/installer version']) || '').trim();
+            let $existingVersion = (this.runCommandsSync(['npm ls @ostro/installer -g version --depth=0']) || '');
+            $existingVersion = $existingVersion.replace(/[^@]*@ostro\/installer@([\d.]+)\s*/, '$1').trim();
 
-        this.output.write('[1/7] ');
-        let versionMessage = $existingVersion === $currentVersion
-            ? '@ostro/installer version verified'
-            : 'Update required: "npm install @ostro/installer@latest -g"';
+            this.output.write('[1/7] ');
+            let versionMessage = $existingVersion === $currentVersion
+                ? '@ostro/installer version verified'
+                : 'Update required: "npm install @ostro/installer@latest -g"';
 
-        if ($existingVersion !== $currentVersion) {
-            this.error(versionMessage);
-        } else {
-            this.info(versionMessage);
-        }
+            if ($existingVersion !== $currentVersion) {
+                this.error(versionMessage);
+            } else {
+                this.info(versionMessage);
+            }
 
-        let directoryCreated = false;
-        try {
             let osType = os.type();
             if ($directory !== '.' && this.input.getOption('force')) {
                 try {

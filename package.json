@@ -18,7 +18,7 @@
     "@ostro/support": "^1.2.1"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 0"
+    "test": "jest"
   },
   "engines": {
     "node": ">=14.0.0"
@@ -43,5 +43,8 @@
   "bugs": {
     "url": "https://github.com/ostrojs/installer/issues"
   },
-  "homepage": "https://github.com/ostrojs/installer#readme"
+  "homepage": "https://github.com/ostrojs/installer#readme",
+  "devDependencies": {
+    "jest": "^30.5.1"
+  }
 }
