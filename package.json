@@ -18,7 +18,7 @@
     "@ostro/support": "^1.2.1"
   },
   "scripts": {
-    "test": "jest"
+    "test": "npx c8 npx jest"
   },
   "engines": {
     "node": ">=14.0.0"
