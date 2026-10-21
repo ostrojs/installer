@@ -1,47 +1,65 @@
 {
-  "name": "@ostro/installer",
-  "version": "1.0.6",
-  "description": "Official CLI installer for the OstroJS framework",
-  "main": "index.js",
-  "type": "commonjs",
-  "bin": {
-    "ostro": "index.js"
-  },
-  "files": [
-    "index.js",
-    "newCommand.js",
-    "LICENSE.md",
-    "README.md"
-  ],
-  "dependencies": {
-    "@ostro/console": "^1.0.5",
-    "@ostro/support": "^1.2.1"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 0"
-  },
-  "engines": {
-    "node": ">=14.0.0"
-  },
-  "engineStrict": true,
-  "preferGlobal": true,
-  "keywords": [
-    "ostro",
-    "ostrojs",
-    "framework",
-    "installer",
-    "cli",
-    "scaffold",
-    "generator"
-  ],
-  "author": "OstroJS Team",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ostrojs/installer.git"
-  },
-  "bugs": {
-    "url": "https://github.com/ostrojs/installer/issues"
-  },
-  "homepage": "https://github.com/ostrojs/installer#readme"
+    "name": "@ostro/installer",
+    "version": "2.0.0-alpha.1",
+    "description": "Official CLI installer for the OstroJS framework",
+    "main": "build/index.js",
+    "types": "build/index.d.ts",
+    "bin": {
+        "ostro": "build/index.js"
+    },
+    "files": [
+        "build",
+        "LICENSE.md",
+        "README.md"
+    ],
+    "exports": {
+        ".": {
+            "types": "./build/index.d.ts",
+            "default": "./build/index.js"
+        },
+        "./*": {
+            "types": "./build/*.d.ts",
+            "default": "./build/*.js"
+        }
+    },
+    "dependencies": {
+        "@ostro/console": "^2.0.0-alpha.1",
+        "@ostro/support": "^2.0.0-alpha.1",
+        "typescript": "^5.8.0"
+    },
+    "scripts": {
+        "build": "npx tsc -p tsconfig.build.json && chmod +x build/index.js && node scripts/build.js",
+        "prepublishOnly": "npm run build",
+        "test": "npx c8 npx jest",
+        "clean": "rm -rf build coverage"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "engineStrict": true,
+    "preferGlobal": true,
+    "keywords": [
+        "ostro",
+        "ostrojs",
+        "framework",
+        "installer",
+        "cli",
+        "scaffold",
+        "generator"
+    ],
+    "author": "OstroJS Team",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ostrojs/installer.git"
+    },
+    "bugs": {
+        "url": "https://github.com/ostrojs/installer/issues"
+    },
+    "homepage": "https://github.com/ostrojs/installer#readme",
+    "devDependencies": {
+        "jest": "^30.5.1",
+        "typescript": "^5.8.0",
+        "@types/node": "^22.0.0"
+    }
 }

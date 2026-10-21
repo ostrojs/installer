@@ -5,15 +5,14 @@
  * @module @ostro/installer
  */
 
-require('@ostro/support/helpers');
-const ConsoleApplication = require('@ostro/console');
-const NewCommand = require('./newCommand');
+import '@ostro/support/helpers';
+import ConsoleApplication from '@ostro/console';
+import NewCommand from './newCommand';
 
 /**
  * Initialize the Ostro Console Application instance.
- * @type {ConsoleApplication}
  */
-const $app = new ConsoleApplication();
+const $app: ConsoleApplication = new ConsoleApplication();
 
 /**
  * Register available CLI commands.
@@ -25,10 +24,12 @@ $app.add(new NewCommand());
  * Exits with status code 0 on success, or status code 1 on error.
  */
 $app.run(process.argv.slice(2))
-    .then(() => {
+    .then((): void => {
         process.exit(0);
     })
-    .catch((err) => {
+    .catch((err: unknown): void => {
         console.error(err);
         process.exit(1);
     });
+
+export default $app;
