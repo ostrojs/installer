@@ -128,7 +128,11 @@ class NewCommand extends Command {
 
             tempWorkingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ostro-install-'));
 
-            const $url: string = this.runCommandsSync(['npm v @ostro/ostro dist.tarball']);
+            const targetPkg: string = this.input.getOption('dev') ? '@ostro/ostro@dev' : '@ostro/ostro@alpha';
+            let $url: string = (this.runCommandsSync([`npm v ${targetPkg} dist.tarball`]) || '').trim();
+            if (!$url) {
+                $url = (this.runCommandsSync(['npm v @ostro/ostro dist.tarball']) || '').trim();
+            }
             const $commands: string[] = [];
 
             if (osType === 'Windows_NT') {
