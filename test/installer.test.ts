@@ -5,8 +5,6 @@ import path from 'path';
 import readline from 'readline';
 import { EventEmitter } from 'events';
 
-// Ensure helpers are loaded
-import '@ostro/support/helpers';
 import NewCommand from '../src/newCommand';
 
 describe('NewCommand', () => {
