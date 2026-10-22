@@ -170,11 +170,7 @@ class NewCommand extends Command {
             } else {
                 this.startSpinner('[5/7]', 'Building TypeScript framework...');
                 await this.buildWithTsc(tempWorkingDir);
-                const viewsSrc: string = path.join(tempWorkingDir, 'resources', 'views');
-                const viewsDist: string = path.join(tempWorkingDir, '.dist', 'resources', 'views');
-                if (fs.existsSync(viewsSrc)) {
-                    fs.cpSync(viewsSrc, viewsDist, { recursive: true });
-                }
+                this.copyDistAssets(tempWorkingDir);
                 this.stopSpinnerAndClear();
                 this.output.write('[5/7] ');
                 this.info('TypeScript framework built');
@@ -428,6 +424,91 @@ class NewCommand extends Command {
     }
 
     /**
+     * Parse .gitignore rules from project root.
+     *
+     * @param directory - Application root directory path.
+     * @returns Array of pattern strings.
+     */
+    public getGitignorePatterns(directory: string): string[] {
+        const gitignoreFile: string = path.join(directory, '.gitignore');
+        if (!fs.existsSync(gitignoreFile)) return [];
+        return fs.readFileSync(gitignoreFile, 'utf8')
+            .split('\n')
+            .map((l: string) => l.trim())
+            .filter((l: string) => Boolean(l) && !l.startsWith('#'));
+    }
+
+    /**
+     * Checks if a relative path should be ignored by .gitignore rules.
+     *
+     * @param relPath - Relative file or folder path.
+     * @param rules - Array of gitignore rules.
+     * @returns True if ignored.
+     */
+    public isIgnoredByGit(relPath: string, rules: string[]): boolean {
+        const norm: string = relPath.replace(/^\//, '');
+        for (const r of rules) {
+            const clean: string = r.replace(/^\//, '').replace(/\/$/, '');
+            if (norm === clean || norm.startsWith(clean + '/')) return true;
+            if (clean.startsWith('*') && norm.endsWith(clean.slice(1))) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Copies necessary runtime assets (.env, package.json, public, views, and assistant)
+     * to .dist directory for deployment, respecting .gitignore rules.
+     *
+     * @param directory - Application root directory path.
+     */
+    public copyDistAssets(directory: string): void {
+        const distDir: string = path.join(directory, '.dist');
+        if (!fs.existsSync(distDir)) {
+            fs.mkdirSync(distDir, { recursive: true });
+        }
+
+        const rules: string[] = this.getGitignorePatterns(directory);
+
+        // Copy and transpile assistant without extension for nodejs execution in .dist
+        const assistantSrc: string = path.join(directory, 'assistant');
+        if (fs.existsSync(assistantSrc)) {
+            const jsAssistant: string = `#!/usr/bin/env node\n\nconst appModule = require('./bootstrap/app');\nconst app = appModule && appModule.default ? appModule.default : appModule;\n\nconst kernel = app.make('@ostro/contracts/console/kernel');\nkernel.handle(\n    process.argv.slice(2),\n);\n`;
+            fs.writeFileSync(path.join(distDir, 'assistant'), jsAssistant, { mode: 0o755 });
+        }
+
+        // Copy package.json to .dist and adapt entrypoint to app.js
+        const pkgSrc: string = path.join(directory, 'package.json');
+        if (fs.existsSync(pkgSrc) && !this.isIgnoredByGit('package.json', rules)) {
+            const pkg: any = JSON.parse(fs.readFileSync(pkgSrc, 'utf8'));
+            pkg.main = 'app.js';
+            delete pkg.types;
+            if (pkg.scripts) {
+                pkg.scripts['server:start'] = 'node app.js';
+                delete pkg.scripts.build;
+                delete pkg.scripts['build:clean'];
+                delete pkg.scripts.dev;
+                delete pkg.scripts.watch;
+            }
+            fs.writeFileSync(path.join(distDir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
+        }
+
+        // Copy runtime folders and config files if not gitignored
+        const assets: string[] = ['.env', 'public', 'resources/views'];
+        for (const item of assets) {
+            const s: string = path.join(directory, item);
+            const d: string = path.join(distDir, item);
+            if (fs.existsSync(s) && !this.isIgnoredByGit(item, rules)) {
+                const stat: fs.Stats = fs.statSync(s);
+                if (stat.isDirectory()) {
+                    fs.cpSync(s, d, { recursive: true });
+                } else {
+                    fs.copyFileSync(s, d);
+                }
+            }
+        }
+    }
+
+    /**
      * Converts a scaffolded OstroJS application to pure JavaScript.
      *
      * @param directory - Application root directory path.
@@ -448,6 +529,12 @@ class NewCommand extends Command {
         this.cleanJavaScriptArtifacts(directory);
         this.removeTypeScriptArtifacts(directory);
         this.updatePackageJsonForJavaScript(directory);
+
+        const assistantPath: string = path.join(directory, 'assistant');
+        if (fs.existsSync(assistantPath)) {
+            const jsAssistant = `#!/usr/bin/env node\n\nconst appModule = require('./bootstrap/app');\nconst app = appModule && appModule.default ? appModule.default : appModule;\n\nconst kernel = app.make('@ostro/contracts/console/kernel');\nkernel.handle(\n    process.argv.slice(2),\n);\n`;
+            fs.writeFileSync(assistantPath, jsAssistant, { mode: 0o755 });
+        }
     }
 
     /**
