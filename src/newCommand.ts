@@ -196,6 +196,7 @@ class NewCommand extends Command {
             fs.mkdirSync($directory, { recursive: true });
             directoryCreated = true;
             fs.cpSync(tempWorkingDir, $directory, { recursive: true });
+            this.fixBinSymlinks($directory, tempWorkingDir);
             this.stopSpinnerAndClear();
 
             try {
@@ -658,6 +659,35 @@ class NewCommand extends Command {
             delete pkg.devDependencies.tsx;
         }
         fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+    }
+
+    /**
+     * Fix bin symlinks created by npm in node_modules/.bin so they don't point to the temporary directory.
+     *
+     * @param directory - Application root directory path.
+     * @param tempWorkingDir - Temporary directory path where npm install ran.
+     */
+    public fixBinSymlinks(directory: string, tempWorkingDir: string): void {
+        const binDir: string = path.join(directory, 'node_modules', '.bin');
+        if (!fs.existsSync(binDir)) return;
+        const normalizedTemp: string = tempWorkingDir.replace(/^\/private/, '');
+        const entries = fs.readdirSync(binDir);
+        for (const entry of entries) {
+            const symlinkPath: string = path.join(binDir, entry);
+            try {
+                const stat = fs.lstatSync(symlinkPath);
+                if (stat.isSymbolicLink()) {
+                    const target: string = fs.readlinkSync(symlinkPath);
+                    const normalizedTarget: string = target.replace(/^\/private/, '');
+                    if (path.isAbsolute(target) && (target.startsWith(tempWorkingDir) || normalizedTarget.startsWith(normalizedTemp))) {
+                        const relPart: string = normalizedTarget.substring(normalizedTemp.length).replace(/^[/\\]+/, '');
+                        const newTarget: string = path.join(directory, relPart);
+                        fs.unlinkSync(symlinkPath);
+                        fs.symlinkSync(newTarget, symlinkPath);
+                    }
+                }
+            } catch (_) { }
+        }
     }
 }
 

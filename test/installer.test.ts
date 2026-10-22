@@ -776,6 +776,37 @@ exports.default = app;
         }
     });
 
+    test('fixBinSymlinks updates symlinks targeting tempWorkingDir', () => {
+        const cmd: NewCommand = new NewCommand();
+        const tmpDir: string = path.join(os.tmpdir(), `test-fix-bin-${Date.now()}`);
+        const tempWorkingDir: string = path.join(os.tmpdir(), `test-temp-worker-${Date.now()}`);
+        const binDir: string = path.join(tmpDir, 'node_modules', '.bin');
+        fs.mkdirSync(binDir, { recursive: true });
+
+        // Create target in destination and dummy symlinks
+        const targetFile: string = path.join(tmpDir, 'node_modules', 'ts-node', 'bin.js');
+        fs.mkdirSync(path.dirname(targetFile), { recursive: true });
+        fs.writeFileSync(targetFile, '#!/usr/bin/env node');
+
+        const symlinkPath: string = path.join(binDir, 'ts-node');
+        const oldTarget: string = path.join(tempWorkingDir, 'node_modules', 'ts-node', 'bin.js');
+        fs.symlinkSync(oldTarget, symlinkPath);
+
+        const regularFile: string = path.join(binDir, 'regular.txt');
+        fs.writeFileSync(regularFile, 'regular file');
+
+        const unrelatedSymlink: string = path.join(binDir, 'other-link');
+        fs.symlinkSync('/usr/local/bin/dummy', unrelatedSymlink);
+
+        try {
+            cmd.fixBinSymlinks(tmpDir, tempWorkingDir);
+            expect(fs.readlinkSync(symlinkPath)).toBe(targetFile);
+            expect(fs.readlinkSync(unrelatedSymlink)).toBe('/usr/local/bin/dummy');
+        } finally {
+            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
 });
 
 
