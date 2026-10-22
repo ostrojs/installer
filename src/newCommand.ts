@@ -158,33 +158,6 @@ class NewCommand extends Command {
             const envPath = path.join(tempWorkingDir, '.env');
             if (fs.existsSync(envExamplePath)) {
                 fs.copyFileSync(envExamplePath, envPath);
-            } else if (!fs.existsSync(envPath)) {
-                const defaultEnv = [
-                    'APP_NAME=Ostro',
-                    'APP_ENV=local',
-                    'APP_KEY=',
-                    'APP_DEBUG=true',
-                    'APP_URL=http://localhost',
-                    'APP_PORT=8081',
-                    '',
-                    'LOG_CHANNEL=stack',
-                    'LOG_LEVEL=debug',
-                    '',
-                    'DB_CONNECTION=mysql',
-                    'DB_HOST=127.0.0.1',
-                    'DB_PORT=3306',
-                    'DB_DATABASE=ostro',
-                    'DB_USERNAME=root',
-                    'DB_PASSWORD=',
-                    '',
-                    'CACHE_DRIVER=file',
-                    'FILESYSTEM_DRIVER=local',
-                    'SESSION_DRIVER=file',
-                    'SESSION_LIFETIME=120',
-                    ''
-                ].join('\n');
-                fs.writeFileSync(envPath, defaultEnv);
-                fs.writeFileSync(envExamplePath, defaultEnv);
             }
             this.output.write('[3/7] ');
             this.info('Environment file generated');
@@ -205,7 +178,6 @@ class NewCommand extends Command {
             } else {
                 this.startSpinner('[5/7]', 'Building TypeScript framework...');
                 await this.buildWithTsc(tempWorkingDir);
-                this.copyDistAssets(tempWorkingDir);
                 this.stopSpinnerAndClear();
                 this.output.write('[5/7] ');
                 this.info('TypeScript framework built');
@@ -220,24 +192,10 @@ class NewCommand extends Command {
             this.output.write('[6/7] ');
             this.info('Key generated');
 
-            if ($name !== '.') {
-                const dbName: string = $name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-                const tempEnv = path.join(tempWorkingDir, '.env');
-                const tempEnvExample = path.join(tempWorkingDir, '.env.example');
-                if (fs.existsSync(tempEnv)) {
-                    this.replaceInFile('APP_URL=http://localhost', 'APP_URL=http://' + $name + '.test', tempEnv);
-                    this.replaceInFile('DB_DATABASE=ostro', 'DB_DATABASE=' + dbName, tempEnv);
-                }
-                if (fs.existsSync(tempEnvExample)) {
-                    this.replaceInFile('DB_DATABASE=ostro', 'DB_DATABASE=' + dbName, tempEnvExample);
-                }
-            }
-
             this.startSpinner('[7/7]', 'Publishing to destination directory...');
             fs.mkdirSync($directory, { recursive: true });
             directoryCreated = true;
             fs.cpSync(tempWorkingDir, $directory, { recursive: true });
-            this.fixBinSymlinks($directory, tempWorkingDir);
             this.stopSpinnerAndClear();
 
             try {
@@ -485,95 +443,10 @@ class NewCommand extends Command {
      */
     public async buildWithTsc(directory: string): Promise<void> {
         const tscCmd: string = this.getTscCommand();
-        const configPath: string = fs.existsSync(path.join(directory, 'tsconfig.build.json'))
-            ? 'tsconfig.build.json'
-            : 'tsconfig.json';
+        const configPath: string = fs.existsSync(path.join(directory, 'tsconfig.json'))
+            ? 'tsconfig.json'
+            : (fs.existsSync(path.join(directory, 'tsconfig.build.json')) ? 'tsconfig.build.json' : 'tsconfig.json');
         await this.runCommandsAsync([`${tscCmd} -p ${configPath}`], { cwd: directory });
-    }
-
-    /**
-     * Parse .gitignore rules from project root.
-     *
-     * @param directory - Application root directory path.
-     * @returns Array of pattern strings.
-     */
-    public getGitignorePatterns(directory: string): string[] {
-        const gitignoreFile: string = path.join(directory, '.gitignore');
-        if (!fs.existsSync(gitignoreFile)) return [];
-        return fs.readFileSync(gitignoreFile, 'utf8')
-            .split('\n')
-            .map((l: string) => l.trim())
-            .filter((l: string) => Boolean(l) && !l.startsWith('#'));
-    }
-
-    /**
-     * Checks if a relative path should be ignored by .gitignore rules.
-     *
-     * @param relPath - Relative file or folder path.
-     * @param rules - Array of gitignore rules.
-     * @returns True if ignored.
-     */
-    public isIgnoredByGit(relPath: string, rules: string[]): boolean {
-        const norm: string = relPath.replace(/^\//, '');
-        for (const r of rules) {
-            const clean: string = r.replace(/^\//, '').replace(/\/$/, '');
-            if (norm === clean || norm.startsWith(clean + '/')) return true;
-            if (clean.startsWith('*') && norm.endsWith(clean.slice(1))) return true;
-        }
-        return false;
-    }
-
-    /**
-     * Copies necessary runtime assets (.env, package.json, public, views, and assistant)
-     * to .dist directory for deployment, respecting .gitignore rules.
-     *
-     * @param directory - Application root directory path.
-     */
-    public copyDistAssets(directory: string): void {
-        const distDir: string = path.join(directory, '.dist');
-        if (!fs.existsSync(distDir)) {
-            fs.mkdirSync(distDir, { recursive: true });
-        }
-
-        const rules: string[] = this.getGitignorePatterns(directory);
-
-        // Copy and transpile assistant without extension for nodejs execution in .dist
-        const assistantSrc: string = path.join(directory, 'assistant');
-        if (fs.existsSync(assistantSrc)) {
-            const jsAssistant: string = `#!/usr/bin/env node\n\nconst appModule = require('./bootstrap/app');\nconst app = appModule && appModule.default ? appModule.default : appModule;\n\nconst kernel = app.make('@ostro/contracts/console/kernel');\nkernel.handle(\n    process.argv.slice(2),\n);\n`;
-            fs.writeFileSync(path.join(distDir, 'assistant'), jsAssistant, { mode: 0o755 });
-        }
-
-        // Copy package.json to .dist and adapt entrypoint to app.js
-        const pkgSrc: string = path.join(directory, 'package.json');
-        if (fs.existsSync(pkgSrc) && !this.isIgnoredByGit('package.json', rules)) {
-            const pkg: any = JSON.parse(fs.readFileSync(pkgSrc, 'utf8'));
-            pkg.main = 'app.js';
-            delete pkg.types;
-            if (pkg.scripts) {
-                pkg.scripts['server:start'] = 'node app.js';
-                delete pkg.scripts.build;
-                delete pkg.scripts['build:clean'];
-                delete pkg.scripts.dev;
-                delete pkg.scripts.watch;
-            }
-            fs.writeFileSync(path.join(distDir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
-        }
-
-        // Copy runtime folders and config files if not gitignored
-        const assets: string[] = ['.env', 'public', 'resources/views'];
-        for (const item of assets) {
-            const s: string = path.join(directory, item);
-            const d: string = path.join(distDir, item);
-            if (fs.existsSync(s) && !this.isIgnoredByGit(item, rules)) {
-                const stat: fs.Stats = fs.statSync(s);
-                if (stat.isDirectory()) {
-                    fs.cpSync(s, d, { recursive: true });
-                } else {
-                    fs.copyFileSync(s, d);
-                }
-            }
-        }
     }
 
     /**
@@ -583,26 +456,9 @@ class NewCommand extends Command {
      */
     public async convertToJavaScript(directory: string): Promise<void> {
         await this.buildWithTsc(directory);
-        const distDir: string = path.join(directory, '.dist');
-        const buildDir: string = path.join(directory, 'build');
-        const compiledDir: string = fs.existsSync(distDir) ? distDir : (fs.existsSync(buildDir) ? buildDir : '');
-        if (compiledDir) {
-            fs.cpSync(compiledDir, directory, { recursive: true });
-            fs.rmSync(compiledDir, { recursive: true, force: true });
-        }
-        const srcDir: string = path.join(directory, 'src');
-        if (fs.existsSync(srcDir)) {
-            fs.rmSync(srcDir, { recursive: true, force: true });
-        }
         this.cleanJavaScriptArtifacts(directory);
         this.removeTypeScriptArtifacts(directory);
         this.updatePackageJsonForJavaScript(directory);
-
-        const assistantPath: string = path.join(directory, 'assistant');
-        if (fs.existsSync(assistantPath)) {
-            const jsAssistant = `#!/usr/bin/env node\n\nconst appModule = require('./bootstrap/app');\nconst app = appModule && appModule.default ? appModule.default : appModule;\n\nconst kernel = app.make('@ostro/contracts/console/kernel');\nkernel.handle(\n    process.argv.slice(2),\n);\n`;
-            fs.writeFileSync(assistantPath, jsAssistant, { mode: 0o755 });
-        }
     }
 
     /**
@@ -802,35 +658,6 @@ class NewCommand extends Command {
             delete pkg.devDependencies.tsx;
         }
         fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-    }
-
-    /**
-     * Fix bin symlinks created by npm in node_modules/.bin so they don't point to the temporary directory.
-     *
-     * @param directory - Application root directory path.
-     * @param tempWorkingDir - Temporary directory path where npm install ran.
-     */
-    public fixBinSymlinks(directory: string, tempWorkingDir: string): void {
-        const binDir: string = path.join(directory, 'node_modules', '.bin');
-        if (!fs.existsSync(binDir)) return;
-        const normalizedTemp: string = tempWorkingDir.replace(/^\/private/, '');
-        const entries = fs.readdirSync(binDir);
-        for (const entry of entries) {
-            const symlinkPath: string = path.join(binDir, entry);
-            try {
-                const stat = fs.lstatSync(symlinkPath);
-                if (stat.isSymbolicLink()) {
-                    const target: string = fs.readlinkSync(symlinkPath);
-                    const normalizedTarget: string = target.replace(/^\/private/, '');
-                    if (path.isAbsolute(target) && (target.startsWith(tempWorkingDir) || normalizedTarget.startsWith(normalizedTemp))) {
-                        const relPart: string = normalizedTarget.substring(normalizedTemp.length).replace(/^[/\\]+/, '');
-                        const newTarget: string = path.join(directory, relPart);
-                        fs.unlinkSync(symlinkPath);
-                        fs.symlinkSync(newTarget, symlinkPath);
-                    }
-                }
-            } catch (_) { }
-        }
     }
 }
 

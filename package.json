@@ -1,6 +1,6 @@
 {
     "name": "@ostro/installer",
-    "version": "2.0.0-alpha.6",
+    "version": "2.0.0-alpha.7",
     "description": "Official CLI installer for the OstroJS framework",
     "main": "build/index.js",
     "types": "./build/types/index.d.ts",
@@ -25,6 +25,7 @@
     "dependencies": {
         "@ostro/console": "^2.0.0-alpha.2",
         "@ostro/support": "^2.0.0-alpha.2",
+        "ts-node": "^10.9.2",
         "typescript": "^5.8.0"
     },
     "scripts": {

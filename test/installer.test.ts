@@ -240,11 +240,16 @@ describe('NewCommand', () => {
                 if (cmdStr.includes('npm v @ostro/ostro dist.tarball')) return 'https://registry.npmjs.org/@ostro/ostro/-/ostro-1.0.0.tgz';
                 return '';
             });
-            jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
+            jest.spyOn(cmd, 'runCommandsAsync').mockImplementation(async (cmds: string[], options?: { cwd?: string }) => {
+                if (options && options.cwd) {
+                    fs.writeFileSync(path.join(options.cwd, '.env.example'), 'APP_URL=http://localhost\nDB_DATABASE=ostro\n');
+                }
+                return 'ok';
+            });
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
             jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
-            jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
+            jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
 
             await cmd.handle();
 
@@ -255,7 +260,6 @@ describe('NewCommand', () => {
             expect(cmd.info).toHaveBeenCalledWith('Key generated');
             expect(cmd.info).toHaveBeenCalledWith('TypeScript framework built');
             expect(cmd.info).toHaveBeenCalledWith('Application ready at destination (TS)');
-            expect(cmd.replaceInFile).toHaveBeenCalled();
             expect(process.exit).not.toHaveBeenCalled();
         });
 
@@ -286,6 +290,7 @@ describe('NewCommand', () => {
             jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
             jest.spyOn(fs, 'rmSync').mockImplementation(() => {});
             jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
+            jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
 
             await cmd.handle();
 
@@ -319,6 +324,7 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
             jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
             jest.spyOn(fs, 'rmSync').mockImplementation(() => {
                 throw new Error('EPERM error');
             });
@@ -472,6 +478,7 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
             jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
             jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
+            jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
             jest.spyOn(cmd, 'convertToJavaScript').mockResolvedValue(undefined);
 
             await cmd.handle();
@@ -505,6 +512,7 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
             jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
             jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
+            jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
             jest.spyOn(cmd, 'convertToJavaScript').mockResolvedValue(undefined);
 
             await cmd.handle();
@@ -651,12 +659,11 @@ describe('NewCommand', () => {
         }
     });
 
-    test('convertToJavaScript runs build, moves files, removes TS artifacts and updates package.json', async () => {
+    test('convertToJavaScript runs build, removes TS artifacts and updates package.json', async () => {
         const cmd: NewCommand = new NewCommand();
         const tmpDir: string = path.join(os.tmpdir(), `test-convert-${Date.now()}`);
-        const buildDir: string = path.join(tmpDir, 'build');
-        fs.mkdirSync(buildDir, { recursive: true });
-        fs.writeFileSync(path.join(buildDir, 'app.js'), 'console.log("hello");');
+        fs.mkdirSync(tmpDir, { recursive: true });
+        fs.writeFileSync(path.join(tmpDir, 'app.js'), 'console.log("hello");');
         fs.writeFileSync(path.join(tmpDir, 'app.ts'), 'console.log("hello");');
         fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({ main: 'app.ts' }));
 
@@ -667,19 +674,6 @@ describe('NewCommand', () => {
             expect(cmd.buildWithTsc).toHaveBeenCalledWith(tmpDir);
             expect(fs.existsSync(path.join(tmpDir, 'app.js'))).toBe(true);
             expect(fs.existsSync(path.join(tmpDir, 'app.ts'))).toBe(false);
-            expect(fs.existsSync(buildDir)).toBe(false);
-        } finally {
-            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
-        }
-    });
-
-    test('convertToJavaScript when build directory does not exist', async () => {
-        const cmd: NewCommand = new NewCommand();
-        const tmpDir: string = path.join(os.tmpdir(), `test-convert-nobuild-${Date.now()}`);
-        fs.mkdirSync(tmpDir, { recursive: true });
-        jest.spyOn(cmd, 'buildWithTsc').mockResolvedValue();
-        try {
-            await cmd.convertToJavaScript(tmpDir);
         } finally {
             if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
         }
@@ -782,41 +776,7 @@ exports.default = app;
         }
     });
 
-    test('fixBinSymlinks updates symlinks targeting tempWorkingDir', () => {
-        const cmd: NewCommand = new NewCommand();
-        const tmpDir: string = path.join(os.tmpdir(), `test-fix-bin-${Date.now()}`);
-        const tempWorkingDir: string = path.join(os.tmpdir(), `test-temp-worker-${Date.now()}`);
-        const binDir: string = path.join(tmpDir, 'node_modules', '.bin');
-        fs.mkdirSync(binDir, { recursive: true });
-
-        // Create target in destination and dummy symlinks
-        const targetFile: string = path.join(tmpDir, 'node_modules', 'ts-node', 'bin.js');
-        fs.mkdirSync(path.dirname(targetFile), { recursive: true });
-        fs.writeFileSync(targetFile, '#!/usr/bin/env node');
-
-        const symlinkPath: string = path.join(binDir, 'ts-node');
-        const oldTarget: string = path.join(tempWorkingDir, 'node_modules', 'ts-node', 'bin.js');
-        fs.symlinkSync(oldTarget, symlinkPath);
-
-        const regularFile: string = path.join(binDir, 'regular.txt');
-        fs.writeFileSync(regularFile, 'regular file');
-
-        const unrelatedSymlink: string = path.join(binDir, 'other-link');
-        fs.symlinkSync('/usr/local/bin/dummy', unrelatedSymlink);
-
-        try {
-            cmd.fixBinSymlinks(tmpDir, tempWorkingDir);
-            expect(fs.readlinkSync(symlinkPath)).toBe(targetFile);
-            expect(fs.readlinkSync(unrelatedSymlink)).toBe('/usr/local/bin/dummy');
-        } finally {
-            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
-        }
-    });
-
-    test('fixBinSymlinks handles non-existent binDir or lstat errors gracefully', () => {
-        const cmd: NewCommand = new NewCommand();
-        const nonExistent: string = path.join(os.tmpdir(), `test-no-bin-${Date.now()}`);
-        expect(() => cmd.fixBinSymlinks(nonExistent, '/tmp/foo')).not.toThrow();
-    });
 });
+
+
 

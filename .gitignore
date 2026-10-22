@@ -5,3 +5,9 @@ AGY.md
 AYG.md
 
 package-lock.json
+.env
+.env.*
+js-app/
+my-app/
+custom_proj/
+
