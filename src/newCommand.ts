@@ -457,6 +457,11 @@ class NewCommand extends Command {
      */
     public async convertToJavaScript(directory: string): Promise<void> {
         await this.buildWithTsc(directory);
+        const distDir: string = path.join(directory, '.dist');
+        if (fs.existsSync(distDir)) {
+            fs.cpSync(distDir, directory, { recursive: true });
+            fs.rmSync(distDir, { recursive: true, force: true });
+        }
         this.cleanJavaScriptArtifacts(directory);
         this.removeTypeScriptArtifacts(directory);
         this.updatePackageJsonForJavaScript(directory);
