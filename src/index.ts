@@ -5,7 +5,6 @@
  * @module @ostro/installer
  */
 
-import '@ostro/support/helpers';
 import ConsoleApplication from '@ostro/console';
 import NewCommand from './newCommand';
 
