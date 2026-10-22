@@ -212,7 +212,10 @@ class NewCommand extends Command {
             }
 
             this.startSpinner('[6/7]', 'Generating application key...');
-            await this.runCommandsAsync(['node assistant key:generate'], { cwd: tempWorkingDir });
+            const keyGenCmd: string = format === 'ts'
+                ? `${this.getTsNodeCommand(tempWorkingDir)} assistant key:generate`
+                : 'node assistant key:generate';
+            await this.runCommandsAsync([keyGenCmd], { cwd: tempWorkingDir });
             this.stopSpinnerAndClear();
             this.output.write('[6/7] ');
             this.info('Key generated');
@@ -448,6 +451,30 @@ class NewCommand extends Command {
             return `"${process.execPath}" "${tscPath}"`;
         } catch (_) {
             return 'npx tsc';
+        }
+    }
+
+    /**
+     * Resolves the ts-node binary path from the installed dependencies.
+     *
+     * @param directory - Application root directory path.
+     * @returns Full executable command for ts-node.
+     */
+    public getTsNodeCommand(directory: string): string {
+        const localTsNodeBin: string = path.join(directory, 'node_modules', '.bin', process.platform === 'win32' ? 'ts-node.cmd' : 'ts-node');
+        if (fs.existsSync(localTsNodeBin)) {
+            return `"${localTsNodeBin}"`;
+        }
+        try {
+            const tsNodeDistPath: string = require.resolve('ts-node/dist/bin.js', { paths: [directory] });
+            return `"${process.execPath}" "${tsNodeDistPath}"`;
+        } catch (_) {
+            try {
+                const tsNodePath: string = require.resolve('ts-node/dist/bin.js');
+                return `"${process.execPath}" "${tsNodePath}"`;
+            } catch (_) {
+                return 'ts-node';
+            }
         }
     }
 
