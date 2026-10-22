@@ -30,10 +30,6 @@ export default {
         ]
     },
     "moduleNameMapper": {
-        "^@ostro/support/(.*)$": "<rootDir>/../support/src/$1",
-        "^@ostro/support$": "<rootDir>/../support/src",
-        "^@ostro/console/(.*)$": "<rootDir>/../console/src/$1",
-        "^@ostro/console$": "<rootDir>/../console/src/application",
         "^@ostro/installer/(.*)$": "<rootDir>/src/$1",
         "^@ostro/installer$": "<rootDir>/src/index"
     },
