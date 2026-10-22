@@ -1,6 +1,6 @@
 {
     "name": "@ostro/installer",
-    "version": "2.0.0-alpha.4",
+    "version": "2.0.0-alpha.5",
     "description": "Official CLI installer for the OstroJS framework",
     "main": "build/index.js",
     "types": "./build/types/index.d.ts",

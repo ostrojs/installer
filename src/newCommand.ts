@@ -154,7 +154,38 @@ class NewCommand extends Command {
             this.output.write('[2/7] ');
             this.info('Application crafted');
 
-            fs.copyFileSync(path.join(tempWorkingDir, '.env.example'), path.join(tempWorkingDir, '.env'));
+            const envExamplePath = path.join(tempWorkingDir, '.env.example');
+            const envPath = path.join(tempWorkingDir, '.env');
+            if (fs.existsSync(envExamplePath)) {
+                fs.copyFileSync(envExamplePath, envPath);
+            } else if (!fs.existsSync(envPath)) {
+                const defaultEnv = [
+                    'APP_NAME=Ostro',
+                    'APP_ENV=local',
+                    'APP_KEY=',
+                    'APP_DEBUG=true',
+                    'APP_URL=http://localhost',
+                    'APP_PORT=8081',
+                    '',
+                    'LOG_CHANNEL=stack',
+                    'LOG_LEVEL=debug',
+                    '',
+                    'DB_CONNECTION=mysql',
+                    'DB_HOST=127.0.0.1',
+                    'DB_PORT=3306',
+                    'DB_DATABASE=ostro',
+                    'DB_USERNAME=root',
+                    'DB_PASSWORD=',
+                    '',
+                    'CACHE_DRIVER=file',
+                    'FILESYSTEM_DRIVER=local',
+                    'SESSION_DRIVER=file',
+                    'SESSION_LIFETIME=120',
+                    ''
+                ].join('\n');
+                fs.writeFileSync(envPath, defaultEnv);
+                fs.writeFileSync(envExamplePath, defaultEnv);
+            }
             this.output.write('[3/7] ');
             this.info('Environment file generated');
 
@@ -188,9 +219,15 @@ class NewCommand extends Command {
 
             if ($name !== '.') {
                 const dbName: string = $name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-                this.replaceInFile('APP_URL=http://localhost', 'APP_URL=http://' + $name + '.test', path.join(tempWorkingDir, '.env'));
-                this.replaceInFile('DB_DATABASE=ostro', 'DB_DATABASE=' + dbName, path.join(tempWorkingDir, '.env'));
-                this.replaceInFile('DB_DATABASE=ostro', 'DB_DATABASE=' + dbName, path.join(tempWorkingDir, '.env.example'));
+                const tempEnv = path.join(tempWorkingDir, '.env');
+                const tempEnvExample = path.join(tempWorkingDir, '.env.example');
+                if (fs.existsSync(tempEnv)) {
+                    this.replaceInFile('APP_URL=http://localhost', 'APP_URL=http://' + $name + '.test', tempEnv);
+                    this.replaceInFile('DB_DATABASE=ostro', 'DB_DATABASE=' + dbName, tempEnv);
+                }
+                if (fs.existsSync(tempEnvExample)) {
+                    this.replaceInFile('DB_DATABASE=ostro', 'DB_DATABASE=' + dbName, tempEnvExample);
+                }
             }
 
             this.startSpinner('[7/7]', 'Publishing to destination directory...');
