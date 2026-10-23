@@ -179,6 +179,8 @@ class NewCommand extends Command {
             } else {
                 this.startSpinner('[5/7]', 'Building TypeScript framework...');
                 this.updatePackageJsonForTypeScript(tempWorkingDir);
+                this.createEslintConfigForTypeScript(tempWorkingDir);
+                await this.installTypeScriptLintDependencies(tempWorkingDir);
                 await this.buildWithTsc(tempWorkingDir);
                 this.stopSpinnerAndClear();
                 this.output.write('[5/7] ');
@@ -480,11 +482,19 @@ class NewCommand extends Command {
         const content: string = [
             '#!/usr/bin/env node',
             '',
-            "require('@ostro/support/helpers');",
+            '// Ensure ts-node is registered for TypeScript execution',
+            'try {',
+            "    const tsNode = require('ts-node');",
+            "    if (!tsNode[Symbol.for('ts-node.register.instance')]) {",
+            '        tsNode.register({ transpileOnly: true });',
+            '    }',
+            '} catch (_) { }',
+            '',
             "const appModule = require('./bootstrap/app');",
             'const app = appModule && appModule.default ? appModule.default : appModule;',
             '',
-            "let kernel = app.make('@ostro/contracts/console/kernel');",
+            "const kernel = app.make('@ostro/contracts/console/kernel');",
+            '',
             'kernel.handle(',
             '    process.argv.slice(2),',
             ');',
@@ -674,8 +684,8 @@ class NewCommand extends Command {
         if (!fs.existsSync(pkgPath)) return;
         const pkg: any = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
         if (pkg.scripts) {
-            pkg.scripts['lint:check'] = 'tsc --noEmit';
-            pkg.scripts['lint:fix'] = 'tsc --noEmit';
+            pkg.scripts['lint:check'] = 'eslint .';
+            pkg.scripts['lint:fix'] = 'eslint . --fix';
             pkg.scripts['build'] = 'npm run lint:check && ostro-build';
         }
         fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
@@ -756,6 +766,62 @@ class NewCommand extends Command {
             ''
         ].join('\n');
         fs.writeFileSync(configPath, content, 'utf8');
+    }
+
+    /**
+     * Create ESLint configuration for TypeScript application using @eslint/js and eslint/config.
+     *
+     * @param directory - Application root directory path.
+     */
+    public createEslintConfigForTypeScript(directory: string): void {
+        const configPath: string = path.join(directory, 'eslint.config.js');
+        const content: string = [
+            "const js = require('@eslint/js');",
+            "const { defineConfig } = require('eslint/config');",
+            "const tseslint = require('typescript-eslint');",
+            '',
+            'module.exports = defineConfig(',
+            '    {',
+            '        ignores: [',
+            "            'node_modules/**',",
+            "            'public/**',",
+            "            'storage/**',",
+            "            '.dist/**',",
+            "            'build/**',",
+            "            'resources/assets/**',",
+            "            'test/**',",
+            "            'jest.config.ts',",
+            "            'webpack.mix.js',",
+            "            'eslint.config.js'",
+            '        ]',
+            '    },',
+            '    js.configs.recommended,',
+            '    ...tseslint.configs.recommended,',
+            '    {',
+            "        files: ['**/*.ts'],",
+            '        languageOptions: {',
+            '            ecmaVersion: 2022,',
+            "            sourceType: 'module'",
+            '        },',
+            '        rules: {',
+            "            '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],",
+            "            '@typescript-eslint/no-explicit-any': 'off'",
+            '        }',
+            '    }',
+            ');',
+            ''
+        ].join('\n');
+        fs.writeFileSync(configPath, content, 'utf8');
+    }
+
+    /**
+     * Install linting dependencies for TypeScript application.
+     *
+     * @param directory - Application root directory path.
+     */
+    public async installTypeScriptLintDependencies(directory: string): Promise<void> {
+        const registryFlag: string = process.env.npm_config_registry ? ` --registry ${process.env.npm_config_registry}` : '';
+        await this.runCommandsAsync([`npm install --save-dev eslint @eslint/js typescript-eslint${registryFlag}`], { cwd: directory });
     }
 
     /**

@@ -683,8 +683,8 @@ describe('NewCommand', () => {
         try {
             cmd.updatePackageJsonForTypeScript(tmpDir);
             const updated = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
-            expect(updated.scripts['lint:check']).toBe('tsc --noEmit');
-            expect(updated.scripts['lint:fix']).toBe('tsc --noEmit');
+            expect(updated.scripts['lint:check']).toBe('eslint .');
+            expect(updated.scripts['lint:fix']).toBe('eslint . --fix');
             expect(updated.scripts['build']).toBe('npm run lint:check && ostro-build');
 
             // Without scripts
@@ -695,6 +695,46 @@ describe('NewCommand', () => {
             expect(() => cmd.updatePackageJsonForTypeScript('/non/existent')).not.toThrow();
         } finally {
             if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    test('createEslintConfigForTypeScript creates eslint.config.js with @eslint/js and typescript-eslint', () => {
+        const cmd: NewCommand = new NewCommand();
+        const tmpDir: string = path.join(os.tmpdir(), `test-ts-eslint-cfg-${Date.now()}`);
+        fs.mkdirSync(tmpDir, { recursive: true });
+        try {
+            cmd.createEslintConfigForTypeScript(tmpDir);
+            const cfgFile = path.join(tmpDir, 'eslint.config.js');
+            expect(fs.existsSync(cfgFile)).toBe(true);
+            const content = fs.readFileSync(cfgFile, 'utf8');
+            expect(content).toContain('@eslint/js');
+            expect(content).toContain('eslint/config');
+            expect(content).toContain('typescript-eslint');
+            expect(content).toContain('@typescript-eslint/no-unused-vars');
+        } finally {
+            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    test('installTypeScriptLintDependencies runs npm install --save-dev eslint @eslint/js typescript-eslint', async () => {
+        const cmd: NewCommand = new NewCommand();
+        const runAsyncSpy = jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
+        const origRegistry = process.env.npm_config_registry;
+
+        try {
+            delete process.env.npm_config_registry;
+            await cmd.installTypeScriptLintDependencies('/dummy/ts-dir');
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint @eslint/js typescript-eslint'], { cwd: '/dummy/ts-dir' });
+
+            process.env.npm_config_registry = 'http://localhost:4873/';
+            await cmd.installTypeScriptLintDependencies('/dummy/ts-dir');
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint @eslint/js typescript-eslint --registry http://localhost:4873/'], { cwd: '/dummy/ts-dir' });
+        } finally {
+            if (origRegistry !== undefined) {
+                process.env.npm_config_registry = origRegistry;
+            } else {
+                delete process.env.npm_config_registry;
+            }
         }
     });
 
