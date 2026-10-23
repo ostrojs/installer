@@ -129,9 +129,10 @@ class NewCommand extends Command {
             tempWorkingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ostro-install-'));
 
             const targetPkg: string = this.input.getOption('dev') ? '@ostro/ostro@dev' : '@ostro/ostro@alpha';
-            let $url: string = (this.runCommandsSync([`npm v ${targetPkg} dist.tarball`]) || '').trim();
+            const registryFlag: string = process.env.npm_config_registry ? ` --registry ${process.env.npm_config_registry}` : '';
+            let $url: string = (this.runCommandsSync([`npm v ${targetPkg} dist.tarball${registryFlag}`]) || '').trim();
             if (!$url) {
-                $url = (this.runCommandsSync(['npm v @ostro/ostro dist.tarball']) || '').trim();
+                $url = (this.runCommandsSync([`npm v @ostro/ostro dist.tarball${registryFlag}`]) || '').trim();
             }
             const $commands: string[] = [];
 
