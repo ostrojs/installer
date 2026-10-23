@@ -178,6 +178,7 @@ class NewCommand extends Command {
                 this.info('Pure JavaScript framework built');
             } else {
                 this.startSpinner('[5/7]', 'Building TypeScript framework...');
+                this.updatePackageJsonForTypeScript(tempWorkingDir);
                 await this.buildWithTsc(tempWorkingDir);
                 this.stopSpinnerAndClear();
                 this.output.write('[5/7] ');
@@ -185,9 +186,7 @@ class NewCommand extends Command {
             }
 
             this.startSpinner('[6/7]', 'Generating application key...');
-            const keyGenCmd: string = format === 'ts'
-                ? `${this.getTsNodeCommand(tempWorkingDir)} assistant key:generate`
-                : 'node assistant key:generate';
+            const keyGenCmd: string = 'node assistant key:generate';
             await this.runCommandsAsync([keyGenCmd], { cwd: tempWorkingDir });
             this.stopSpinnerAndClear();
             this.output.write('[6/7] ');
@@ -466,6 +465,8 @@ class NewCommand extends Command {
         this.cleanJavaScriptArtifacts(directory);
         this.removeTypeScriptArtifacts(directory);
         this.updatePackageJsonForJavaScript(directory);
+        this.createEslintConfigForJavaScript(directory);
+        await this.installJavaScriptLintDependencies(directory);
         this.updateAssistantForJavaScript(directory);
     }
 
@@ -664,6 +665,23 @@ class NewCommand extends Command {
     }
 
     /**
+     * Update package.json to reflect TypeScript linting and build configuration.
+     *
+     * @param directory - Application root directory path.
+     */
+    public updatePackageJsonForTypeScript(directory: string): void {
+        const pkgPath: string = path.join(directory, 'package.json');
+        if (!fs.existsSync(pkgPath)) return;
+        const pkg: any = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        if (pkg.scripts) {
+            pkg.scripts['lint:check'] = 'tsc --noEmit';
+            pkg.scripts['lint:fix'] = 'tsc --noEmit';
+            pkg.scripts['build'] = 'npm run lint:check && ostro-build';
+        }
+        fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+    }
+
+    /**
      * Update package.json to reflect pure JavaScript configuration.
      *
      * @param directory - Application root directory path.
@@ -675,11 +693,13 @@ class NewCommand extends Command {
         pkg.main = 'app.js';
         delete pkg.types;
         if (pkg.scripts) {
-            delete pkg.scripts.build;
             delete pkg.scripts['build:clean'];
             delete pkg.scripts.start;
             delete pkg.scripts.server;
             delete pkg.scripts['start:prod'];
+            pkg.scripts['lint:check'] = 'eslint .';
+            pkg.scripts['lint:fix'] = 'eslint . --fix';
+            pkg.scripts['build'] = 'npm run lint:check';
             pkg.scripts['server:start'] = 'node app.js';
         }
         if (pkg.devDependencies) {
@@ -687,8 +707,65 @@ class NewCommand extends Command {
             delete pkg.devDependencies['@types/node'];
             delete pkg.devDependencies['ts-node'];
             delete pkg.devDependencies.tsx;
+            delete pkg.devDependencies['@ostro/builder'];
+            pkg.devDependencies.eslint = '^9.20.0';
+        } else {
+            pkg.devDependencies = { eslint: '^9.20.0' };
         }
         fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+    }
+
+    /**
+     * Create ESLint configuration for pure JavaScript application.
+     *
+     * @param directory - Application root directory path.
+     */
+    public createEslintConfigForJavaScript(directory: string): void {
+        const configPath: string = path.join(directory, 'eslint.config.js');
+        const content: string = [
+            'module.exports = [',
+            '    {',
+            '        files: ["**/*.js"],',
+            '        ignores: ["node_modules/**", "public/**", "storage/**", ".dist/**", "build/**", "resources/assets/**"],',
+            '        languageOptions: {',
+            '            ecmaVersion: 2022,',
+            '            sourceType: "commonjs",',
+            '            globals: {',
+            '                process: "readonly",',
+            '                __dirname: "readonly",',
+            '                __filename: "readonly",',
+            '                module: "readonly",',
+            '                exports: "writable",',
+            '                require: "readonly",',
+            '                console: "readonly",',
+            '                setTimeout: "readonly",',
+            '                clearTimeout: "readonly",',
+            '                setInterval: "readonly",',
+            '                clearInterval: "readonly",',
+            '                setImmediate: "readonly",',
+            '                clearImmediate: "readonly",',
+            '                Buffer: "readonly"',
+            '            }',
+            '        },',
+            '        rules: {',
+            '            "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],',
+            '            "no-undef": "error"',
+            '        }',
+            '    }',
+            '];',
+            ''
+        ].join('\n');
+        fs.writeFileSync(configPath, content, 'utf8');
+    }
+
+    /**
+     * Install linting dependencies for pure JavaScript application.
+     *
+     * @param directory - Application root directory path.
+     */
+    public async installJavaScriptLintDependencies(directory: string): Promise<void> {
+        const registryFlag: string = process.env.npm_config_registry ? ` --registry ${process.env.npm_config_registry}` : '';
+        await this.runCommandsAsync([`npm install --save-dev eslint${registryFlag}`], { cwd: directory });
     }
 
     /**

@@ -640,7 +640,9 @@ describe('NewCommand', () => {
             const updated = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
             expect(updated.main).toBe('app.js');
             expect(updated.types).toBeUndefined();
-            expect(updated.scripts.build).toBeUndefined();
+            expect(updated.scripts.build).toBe('npm run lint:check');
+            expect(updated.scripts['lint:check']).toBe('eslint .');
+            expect(updated.scripts['lint:fix']).toBe('eslint . --fix');
             expect(updated.scripts['build:clean']).toBeUndefined();
             expect(updated.scripts['start:prod']).toBeUndefined();
             expect(updated.scripts.start).toBeUndefined();
@@ -650,12 +652,87 @@ describe('NewCommand', () => {
             expect(updated.devDependencies['@types/node']).toBeUndefined();
             expect(updated.devDependencies['ts-node']).toBeUndefined();
             expect(updated.devDependencies.tsx).toBeUndefined();
+            expect(updated.devDependencies.eslint).toBeDefined();
             expect(updated.devDependencies.other).toBe('1.0.0');
+
+            // When scripts and devDependencies are missing
+            const emptyPkgFile = path.join(tmpDir, 'package.json');
+            fs.writeFileSync(emptyPkgFile, JSON.stringify({ main: 'app.ts' }));
+            cmd.updatePackageJsonForJavaScript(tmpDir);
+            const updatedEmpty = JSON.parse(fs.readFileSync(emptyPkgFile, 'utf8'));
+            expect(updatedEmpty.devDependencies.eslint).toBeDefined();
 
             // Non-existent package.json should not throw
             expect(() => cmd.updatePackageJsonForJavaScript('/non/existent')).not.toThrow();
         } finally {
             if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    test('updatePackageJsonForTypeScript modifies package.json correctly', () => {
+        const cmd: NewCommand = new NewCommand();
+        const tmpDir: string = path.join(os.tmpdir(), `test-ts-pkg-${Date.now()}`);
+        fs.mkdirSync(tmpDir, { recursive: true });
+        const pkgFile: string = path.join(tmpDir, 'package.json');
+        fs.writeFileSync(pkgFile, JSON.stringify({
+            scripts: {
+                build: 'ostro-build'
+            }
+        }));
+
+        try {
+            cmd.updatePackageJsonForTypeScript(tmpDir);
+            const updated = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
+            expect(updated.scripts['lint:check']).toBe('tsc --noEmit');
+            expect(updated.scripts['lint:fix']).toBe('tsc --noEmit');
+            expect(updated.scripts['build']).toBe('npm run lint:check && ostro-build');
+
+            // Without scripts
+            fs.writeFileSync(pkgFile, JSON.stringify({ name: 'no-scripts' }));
+            cmd.updatePackageJsonForTypeScript(tmpDir);
+
+            // Non-existent package.json should not throw
+            expect(() => cmd.updatePackageJsonForTypeScript('/non/existent')).not.toThrow();
+        } finally {
+            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    test('createEslintConfigForJavaScript creates eslint.config.js', () => {
+        const cmd: NewCommand = new NewCommand();
+        const tmpDir: string = path.join(os.tmpdir(), `test-eslint-cfg-${Date.now()}`);
+        fs.mkdirSync(tmpDir, { recursive: true });
+        try {
+            cmd.createEslintConfigForJavaScript(tmpDir);
+            const cfgFile = path.join(tmpDir, 'eslint.config.js');
+            expect(fs.existsSync(cfgFile)).toBe(true);
+            const content = fs.readFileSync(cfgFile, 'utf8');
+            expect(content).toContain('no-unused-vars');
+            expect(content).toContain('no-undef');
+        } finally {
+            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    test('installJavaScriptLintDependencies runs npm install --save-dev eslint', async () => {
+        const cmd: NewCommand = new NewCommand();
+        const runAsyncSpy = jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
+        const origRegistry = process.env.npm_config_registry;
+
+        try {
+            delete process.env.npm_config_registry;
+            await cmd.installJavaScriptLintDependencies('/dummy/dir');
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint'], { cwd: '/dummy/dir' });
+
+            process.env.npm_config_registry = 'http://localhost:4873/';
+            await cmd.installJavaScriptLintDependencies('/dummy/dir');
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint --registry http://localhost:4873/'], { cwd: '/dummy/dir' });
+        } finally {
+            if (origRegistry !== undefined) {
+                process.env.npm_config_registry = origRegistry;
+            } else {
+                delete process.env.npm_config_registry;
+            }
         }
     });
 
@@ -668,12 +745,14 @@ describe('NewCommand', () => {
         fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({ main: 'app.ts' }));
 
         jest.spyOn(cmd, 'buildWithTsc').mockResolvedValue();
+        jest.spyOn(cmd, 'installJavaScriptLintDependencies').mockResolvedValue();
 
         try {
             await cmd.convertToJavaScript(tmpDir);
             expect(cmd.buildWithTsc).toHaveBeenCalledWith(tmpDir);
             expect(fs.existsSync(path.join(tmpDir, 'app.js'))).toBe(true);
             expect(fs.existsSync(path.join(tmpDir, 'app.ts'))).toBe(false);
+            expect(fs.existsSync(path.join(tmpDir, 'eslint.config.js'))).toBe(true);
         } finally {
             if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
         }
