@@ -25,7 +25,7 @@
     },
     "dependencies": {
         "@ostro/console": "^2.0.0-alpha.6",
-        "@ostro/support": "^2.0.0-alpha.5",
+        "@ostro/support": "^2.0.0-alpha.6",
         "ts-node": "^10.9.2",
         "typescript": "^5.8.0"
     },
