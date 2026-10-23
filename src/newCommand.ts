@@ -466,6 +466,30 @@ class NewCommand extends Command {
         this.cleanJavaScriptArtifacts(directory);
         this.removeTypeScriptArtifacts(directory);
         this.updatePackageJsonForJavaScript(directory);
+        this.updateAssistantForJavaScript(directory);
+    }
+
+    /**
+     * Update assistant executable to pure JavaScript without ts-node or checks.
+     *
+     * @param directory - Application root directory path.
+     */
+    public updateAssistantForJavaScript(directory: string): void {
+        const assistantPath: string = path.join(directory, 'assistant');
+        const content: string = [
+            '#!/usr/bin/env node',
+            '',
+            "require('@ostro/support/helpers');",
+            "const appModule = require('./bootstrap/app');",
+            'const app = appModule && appModule.default ? appModule.default : appModule;',
+            '',
+            "let kernel = app.make('@ostro/contracts/console/kernel');",
+            'kernel.handle(',
+            '    process.argv.slice(2),',
+            ');',
+            ''
+        ].join('\n');
+        fs.writeFileSync(assistantPath, content, { mode: 0o755 });
     }
 
     /**
