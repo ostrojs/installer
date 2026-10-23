@@ -800,7 +800,7 @@ class NewCommand extends Command {
             "        'public/**',",
             "        'build/**',",
             "        'resources/assets/**',",
-            "        'webpack.mix.js',",
+            "        'webpack.mix.ts',",
             "        'eslint.config.ts'",
             '    ]),',
             '    js.configs.recommended,',
