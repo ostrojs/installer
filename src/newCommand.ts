@@ -774,31 +774,39 @@ class NewCommand extends Command {
      * @param directory - Application root directory path.
      */
     public createEslintConfigForTypeScript(directory: string): void {
-        const configPath: string = path.join(directory, 'eslint.config.js');
+        const configPath: string = path.join(directory, 'eslint.config.ts');
         const content: string = [
-            "const js = require('@eslint/js');",
-            "const { defineConfig } = require('eslint/config');",
-            "const tseslint = require('typescript-eslint');",
+            "import fs from 'node:fs';",
+            "import path from 'node:path';",
+            "import js from '@eslint/js';",
+            "import { defineConfig, globalIgnores } from 'eslint/config';",
+            "import tseslint from 'typescript-eslint';",
             '',
-            'module.exports = defineConfig(',
-            '    {',
-            '        ignores: [',
-            "            'node_modules/**',",
-            "            'public/**',",
-            "            'storage/**',",
-            "            '.dist/**',",
-            "            'build/**',",
-            "            'resources/assets/**',",
-            "            'test/**',",
-            "            'jest.config.ts',",
-            "            'webpack.mix.js',",
-            "            'eslint.config.js'",
-            '        ]',
-            '    },',
+            '// Level 1: Read tsconfig as the first-level configuration base',
+            "const tsconfigPath = path.join(process.cwd(), 'tsconfig.json');",
+            "const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf8'));",
+            '',
+            "const tsIncludes: string[] = tsconfig.include || ['**/*.ts'];",
+            'const tsExcludes: string[] = (tsconfig.exclude || []).map((pattern: string) => {',
+            "    if (pattern.startsWith('*')) return pattern;",
+            "    return pattern.includes('/') || pattern.includes('*') ? pattern : `${pattern}/**`;",
+            '});',
+            '',
+            '// Level 2: ESLint configuration built on top of tsconfig',
+            'export default defineConfig(',
+            '    globalIgnores([',
+            '        ...tsExcludes,',
+            "        'storage/**',",
+            "        'public/**',",
+            "        'build/**',",
+            "        'resources/assets/**',",
+            "        'webpack.mix.js',",
+            "        'eslint.config.ts'",
+            '    ]),',
             '    js.configs.recommended,',
             '    ...tseslint.configs.recommended,',
             '    {',
-            "        files: ['**/*.ts'],",
+            '        files: tsIncludes,',
             '        languageOptions: {',
             '            ecmaVersion: 2022,',
             "            sourceType: 'module'",
@@ -821,7 +829,7 @@ class NewCommand extends Command {
      */
     public async installTypeScriptLintDependencies(directory: string): Promise<void> {
         const registryFlag: string = process.env.npm_config_registry ? ` --registry ${process.env.npm_config_registry}` : '';
-        await this.runCommandsAsync([`npm install --save-dev eslint @eslint/js typescript-eslint${registryFlag}`], { cwd: directory });
+        await this.runCommandsAsync([`npm install --save-dev eslint @eslint/js typescript-eslint jiti${registryFlag}`], { cwd: directory });
     }
 
     /**
