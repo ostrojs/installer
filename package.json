@@ -1,6 +1,6 @@
 {
     "name": "@ostro/installer",
-    "version": "2.0.3",
+    "version": "2.0.4-alpha.0",
     "description": "Official CLI installer for the OstroJS framework",
     "main": "build/index.js",
     "types": "./build/types/index.d.ts",
@@ -24,8 +24,8 @@
         }
     },
     "dependencies": {
-        "@ostro/console": "^2.0.0-alpha.5",
-        "@ostro/support": "^2.0.0-alpha.4",
+        "@ostro/console": "^2.0.0-alpha.6",
+        "@ostro/support": "^2.0.0-alpha.5",
         "ts-node": "^10.9.2",
         "typescript": "^5.8.0"
     },
@@ -68,7 +68,7 @@
         "c8": "^10.1.3",
         "ts-jest": "^29.4.15",
         "ts-node": "^10.9.2",
-        "@ostro/builder": "^2.0.0-alpha.2"
+        "@ostro/builder": "^2.0.0-alpha.3"
     },
     "overrides": {
         "sprintf-js": "^1.1.3",
