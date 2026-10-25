@@ -18,12 +18,14 @@ const tsExcludes: string[] = (tsconfig.exclude || []).map((pattern: string) => {
 export default defineConfig(
     globalIgnores([
         ...tsExcludes,
+        '.dist/**',
         'storage/**',
         'public/**',
         'build/**',
         'resources/assets/**',
-        'webpack.mix.ts',
-        'eslint.config.ts'
+        'webpack.mix.*',
+        'eslint.config.*',
+        'jest.config.*'
     ]),
     js.configs.recommended,
     ...tseslint.configs.recommended,

@@ -155,7 +155,7 @@ describe('NewCommand', () => {
         jest.spyOn(cmd, 'updateSingleLine').mockImplementation(() => {});
 
         // 1. Success case
-        const mockChildSuccess = new EventEmitter() as unknown as import("child_process").ChildProcess;
+        const mockChildSuccess: any = new EventEmitter();
         mockChildSuccess.stdout = new EventEmitter();
         mockChildSuccess.stderr = new EventEmitter();
 
@@ -178,7 +178,7 @@ describe('NewCommand', () => {
         await expect(promiseSuccess).resolves.toBeUndefined();
 
         // 2. Failure on close with non-zero code
-        const mockChildFail = new EventEmitter() as unknown as import("child_process").ChildProcess;
+        const mockChildFail: any = new EventEmitter();
         mockChildFail.stdout = new EventEmitter();
         mockChildFail.stderr = new EventEmitter();
         (child_process.exec as unknown as jest.Mock).mockReturnValue(mockChildFail);
@@ -188,7 +188,7 @@ describe('NewCommand', () => {
         await expect(promiseFail).rejects.toThrow('npm install failed with exit code 1');
 
         // 3. Child error event
-        const mockChildErr = new EventEmitter() as unknown as import("child_process").ChildProcess;
+        const mockChildErr: any = new EventEmitter();
         mockChildErr.stdout = new EventEmitter();
         mockChildErr.stderr = new EventEmitter();
         (child_process.exec as unknown as jest.Mock).mockReturnValue(mockChildErr);
@@ -540,7 +540,7 @@ describe('NewCommand', () => {
         const cmd: NewCommand = new NewCommand();
         jest.spyOn(cmd, 'updateSingleLine').mockImplementation(() => {});
 
-        const mockChild = new EventEmitter() as unknown as import("child_process").ChildProcess;
+        const mockChild: any = new EventEmitter();
         mockChild.stdout = new EventEmitter();
         mockChild.stderr = new EventEmitter();
         jest.spyOn(child_process, 'exec').mockReturnValue(mockChild);
@@ -726,11 +726,11 @@ describe('NewCommand', () => {
         try {
             delete process.env.npm_config_registry;
             await cmd.installTypeScriptLintDependencies('/dummy/ts-dir');
-            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint @eslint/js typescript-eslint jiti'], { cwd: '/dummy/ts-dir' });
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint@^9.20.0 @eslint/js@^9.20.0 typescript-eslint@^8.24.0 jiti@^2.4.2'], { cwd: '/dummy/ts-dir' });
 
             process.env.npm_config_registry = 'http://localhost:4873/';
             await cmd.installTypeScriptLintDependencies('/dummy/ts-dir');
-            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint @eslint/js typescript-eslint jiti --registry http://localhost:4873/'], { cwd: '/dummy/ts-dir' });
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint@^9.20.0 @eslint/js@^9.20.0 typescript-eslint@^8.24.0 jiti@^2.4.2 --registry http://localhost:4873/'], { cwd: '/dummy/ts-dir' });
         } finally {
             if (origRegistry !== undefined) {
                 process.env.npm_config_registry = origRegistry;
@@ -764,11 +764,11 @@ describe('NewCommand', () => {
         try {
             delete process.env.npm_config_registry;
             await cmd.installJavaScriptLintDependencies('/dummy/dir');
-            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint'], { cwd: '/dummy/dir' });
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint@^9.20.0'], { cwd: '/dummy/dir' });
 
             process.env.npm_config_registry = 'http://localhost:4873/';
             await cmd.installJavaScriptLintDependencies('/dummy/dir');
-            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint --registry http://localhost:4873/'], { cwd: '/dummy/dir' });
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint@^9.20.0 --registry http://localhost:4873/'], { cwd: '/dummy/dir' });
         } finally {
             if (origRegistry !== undefined) {
                 process.env.npm_config_registry = origRegistry;

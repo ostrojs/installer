@@ -8,8 +8,8 @@ import type { ExecOptions, ExecSyncOptions } from 'node:child_process';
 
 interface NewCommand {
     input: {
-        getArgument(name: string): string;
-        getOption(name: string): unknown;
+        getArgument(name: string): any;
+        getOption(name: string): any;
     };
     output: {
         write(message: string): void;
@@ -476,6 +476,8 @@ class NewCommand extends Command {
         this.createEslintConfigForJavaScript(directory);
         await this.installJavaScriptLintDependencies(directory);
         this.updateAssistantForJavaScript(directory);
+        this.updateJestConfigForJavaScript(directory);
+        this.updateWebpackMixForJavaScript(directory);
     }
 
     /**
@@ -507,6 +509,76 @@ class NewCommand extends Command {
             ''
         ].join('\n');
         fs.writeFileSync(assistantPath, content, { mode: 0o755 });
+    }
+
+    /**
+     * Update Jest configuration for pure JavaScript mode.
+     *
+     * @param directory - Application root directory path.
+     */
+    public updateJestConfigForJavaScript(directory: string): void {
+        const configPath: string = path.join(directory, 'jest.config.js');
+        const content: string = [
+            'module.exports = {',
+            "    testEnvironment: 'node',",
+            '    testMatch: [',
+            "        '**/test/**/*.test.js'",
+            '    ],',
+            '    modulePathIgnorePatterns: [',
+            "        '<rootDir>/build',",
+            "        '<rootDir>/.dist'",
+            '    ],',
+            '    moduleNameMapper: {',
+            "        '^~/(.*)$': '<rootDir>/$1'",
+            '    },',
+            '    collectCoverage: true,',
+            "    coverageDirectory: 'coverage',",
+            '    coverageReporters: [',
+            "        'text',",
+            "        'lcov',",
+            "        'clover'",
+            '    ],',
+            '    collectCoverageFrom: [',
+            "        '<rootDir>/app/**/*.js',",
+            "        '<rootDir>/bootstrap/app.js',",
+            "        '<rootDir>/routes/**/*.js',",
+            "        '<rootDir>/database/migrations/**/*.js',",
+            "        '<rootDir>/database/seeders/**/*.js',",
+            "        '!<rootDir>/node_modules/**',",
+            "        '!<rootDir>/test/**',",
+            "        '!<rootDir>/coverage/**'",
+            '    ]',
+            '};',
+            ''
+        ].join('\n');
+        fs.writeFileSync(configPath, content, 'utf8');
+        try {
+            const tsJestConfig = path.join(directory, 'jest.config.ts');
+            if (fs.existsSync(tsJestConfig)) fs.unlinkSync(tsJestConfig);
+        } catch (_) { }
+    }
+
+    /**
+     * Update Webpack Mix configuration for pure JavaScript mode.
+     *
+     * @param directory - Application root directory path.
+     */
+    public updateWebpackMixForJavaScript(directory: string): void {
+        const configPath: string = path.join(directory, 'webpack.mix.js');
+        const content: string = [
+            "const mix = require('laravel-mix');",
+            '',
+            "mix.js('resources/assets/js/app.js', 'public/js')",
+            "    .postCss('resources/assets/css/app.css', 'public/css', [",
+            '        //',
+            '    ]);',
+            ''
+        ].join('\n');
+        fs.writeFileSync(configPath, content, 'utf8');
+        try {
+            const tsMixConfig = path.join(directory, 'webpack.mix.ts');
+            if (fs.existsSync(tsMixConfig)) fs.unlinkSync(tsMixConfig);
+        } catch (_) { }
     }
 
     /**
@@ -717,6 +789,10 @@ class NewCommand extends Command {
             pkg.scripts['lint:fix'] = 'eslint . --fix';
             pkg.scripts['build'] = 'npm run lint:check';
             pkg.scripts['server:start'] = 'node app.js';
+            pkg.scripts['development'] = 'mix';
+            pkg.scripts['watch'] = 'mix watch';
+            pkg.scripts['watch-poll'] = 'mix watch -- --watch-options-poll=1000';
+            pkg.scripts['hot'] = 'mix watch --hot';
         }
         if (pkg.devDependencies) {
             delete pkg.devDependencies.typescript;
@@ -724,6 +800,9 @@ class NewCommand extends Command {
             delete pkg.devDependencies['ts-node'];
             delete pkg.devDependencies.tsx;
             delete pkg.devDependencies['@ostro/builder'];
+            delete pkg.devDependencies['@types/jest'];
+            delete pkg.devDependencies['ts-jest'];
+            delete pkg.devDependencies['ts-loader'];
             pkg.devDependencies.eslint = '^9.20.0';
         } else {
             pkg.devDependencies = { eslint: '^9.20.0' };
