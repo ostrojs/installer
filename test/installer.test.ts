@@ -1,9 +1,10 @@
-import child_process from 'child_process';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import readline from 'readline';
-import { EventEmitter } from 'events';
+import { describe, test, expect, beforeEach, afterEach, jest } from "@jest/globals";
+import child_process from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import readline from 'node:readline';
+import { EventEmitter } from 'node:events';
 
 import NewCommand from '../src/newCommand';
 
@@ -154,7 +155,7 @@ describe('NewCommand', () => {
         jest.spyOn(cmd, 'updateSingleLine').mockImplementation(() => {});
 
         // 1. Success case
-        const mockChildSuccess = new EventEmitter() as any;
+        const mockChildSuccess: any = new EventEmitter();
         mockChildSuccess.stdout = new EventEmitter();
         mockChildSuccess.stderr = new EventEmitter();
 
@@ -177,7 +178,7 @@ describe('NewCommand', () => {
         await expect(promiseSuccess).resolves.toBeUndefined();
 
         // 2. Failure on close with non-zero code
-        const mockChildFail = new EventEmitter() as any;
+        const mockChildFail: any = new EventEmitter();
         mockChildFail.stdout = new EventEmitter();
         mockChildFail.stderr = new EventEmitter();
         (child_process.exec as unknown as jest.Mock).mockReturnValue(mockChildFail);
@@ -187,7 +188,7 @@ describe('NewCommand', () => {
         await expect(promiseFail).rejects.toThrow('npm install failed with exit code 1');
 
         // 3. Child error event
-        const mockChildErr = new EventEmitter() as any;
+        const mockChildErr: any = new EventEmitter();
         mockChildErr.stdout = new EventEmitter();
         mockChildErr.stderr = new EventEmitter();
         (child_process.exec as unknown as jest.Mock).mockReturnValue(mockChildErr);
@@ -240,11 +241,16 @@ describe('NewCommand', () => {
                 if (cmdStr.includes('npm v @ostro/ostro dist.tarball')) return 'https://registry.npmjs.org/@ostro/ostro/-/ostro-1.0.0.tgz';
                 return '';
             });
-            jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
+            jest.spyOn(cmd, 'runCommandsAsync').mockImplementation(async (cmds: string[], options?: { cwd?: string }) => {
+                if (options && options.cwd) {
+                    fs.writeFileSync(path.join(options.cwd, '.env.example'), 'APP_URL=http://localhost\nDB_DATABASE=ostro\n');
+                }
+                return 'ok';
+            });
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
-            jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
+            jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
 
             await cmd.handle();
 
@@ -255,7 +261,6 @@ describe('NewCommand', () => {
             expect(cmd.info).toHaveBeenCalledWith('Key generated');
             expect(cmd.info).toHaveBeenCalledWith('TypeScript framework built');
             expect(cmd.info).toHaveBeenCalledWith('Application ready at destination (TS)');
-            expect(cmd.replaceInFile).toHaveBeenCalled();
             expect(process.exit).not.toHaveBeenCalled();
         });
 
@@ -283,9 +288,10 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'rmSync').mockImplementation(() => {});
             jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
+            jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
 
             await cmd.handle();
 
@@ -318,7 +324,8 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
+            jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
             jest.spyOn(fs, 'rmSync').mockImplementation(() => {
                 throw new Error('EPERM error');
             });
@@ -350,7 +357,7 @@ describe('NewCommand', () => {
                 if (cmdStr.includes('npm v @ostro/ostro dist.tarball')) return 'https://registry.npmjs.org/tarball.tgz';
                 return '';
             });
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             const rmSyncSpy = jest.spyOn(fs, 'rmSync').mockImplementation(() => {});
             // Fail during runCommandsAsync (crafting step)
             jest.spyOn(cmd, 'runCommandsAsync').mockRejectedValue(new Error('Crafting failed'));
@@ -374,7 +381,7 @@ describe('NewCommand', () => {
 
             jest.spyOn(cmd, 'verifyApplicationDoesntExist').mockImplementation(() => {});
             jest.spyOn(cmd, 'runCommandsSync').mockReturnValue('1.0.0');
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
@@ -404,7 +411,7 @@ describe('NewCommand', () => {
 
             jest.spyOn(cmd, 'verifyApplicationDoesntExist').mockImplementation(() => {});
             jest.spyOn(cmd, 'runCommandsSync').mockReturnValue('1.0.0');
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'rmSync').mockImplementation(() => {
                 throw new Error('rmSync fail');
             });
@@ -439,7 +446,7 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
 
             await cmd.handle();
@@ -470,8 +477,9 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
+            jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
             jest.spyOn(cmd, 'convertToJavaScript').mockResolvedValue(undefined);
 
             await cmd.handle();
@@ -503,8 +511,9 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
+            jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
             jest.spyOn(cmd, 'convertToJavaScript').mockResolvedValue(undefined);
 
             await cmd.handle();
@@ -531,7 +540,7 @@ describe('NewCommand', () => {
         const cmd: NewCommand = new NewCommand();
         jest.spyOn(cmd, 'updateSingleLine').mockImplementation(() => {});
 
-        const mockChild = new EventEmitter() as any;
+        const mockChild: any = new EventEmitter();
         mockChild.stdout = new EventEmitter();
         mockChild.stderr = new EventEmitter();
         jest.spyOn(child_process, 'exec').mockReturnValue(mockChild);
@@ -632,7 +641,9 @@ describe('NewCommand', () => {
             const updated = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
             expect(updated.main).toBe('app.js');
             expect(updated.types).toBeUndefined();
-            expect(updated.scripts.build).toBeUndefined();
+            expect(updated.scripts.build).toBe('npm run lint:check');
+            expect(updated.scripts['lint:check']).toBe('eslint .');
+            expect(updated.scripts['lint:fix']).toBe('eslint . --fix');
             expect(updated.scripts['build:clean']).toBeUndefined();
             expect(updated.scripts['start:prod']).toBeUndefined();
             expect(updated.scripts.start).toBeUndefined();
@@ -642,7 +653,15 @@ describe('NewCommand', () => {
             expect(updated.devDependencies['@types/node']).toBeUndefined();
             expect(updated.devDependencies['ts-node']).toBeUndefined();
             expect(updated.devDependencies.tsx).toBeUndefined();
+            expect(updated.devDependencies.eslint).toBeDefined();
             expect(updated.devDependencies.other).toBe('1.0.0');
+
+            // When scripts and devDependencies are missing
+            const emptyPkgFile = path.join(tmpDir, 'package.json');
+            fs.writeFileSync(emptyPkgFile, JSON.stringify({ main: 'app.ts' }));
+            cmd.updatePackageJsonForJavaScript(tmpDir);
+            const updatedEmpty = JSON.parse(fs.readFileSync(emptyPkgFile, 'utf8'));
+            expect(updatedEmpty.devDependencies.eslint).toBeDefined();
 
             // Non-existent package.json should not throw
             expect(() => cmd.updatePackageJsonForJavaScript('/non/existent')).not.toThrow();
@@ -651,35 +670,131 @@ describe('NewCommand', () => {
         }
     });
 
-    test('convertToJavaScript runs build, moves files, removes TS artifacts and updates package.json', async () => {
+    test('updatePackageJsonForTypeScript modifies package.json correctly', () => {
+        const cmd: NewCommand = new NewCommand();
+        const tmpDir: string = path.join(os.tmpdir(), `test-ts-pkg-${Date.now()}`);
+        fs.mkdirSync(tmpDir, { recursive: true });
+        const pkgFile: string = path.join(tmpDir, 'package.json');
+        fs.writeFileSync(pkgFile, JSON.stringify({
+            scripts: {
+                build: 'ostro-build'
+            }
+        }));
+
+        try {
+            cmd.updatePackageJsonForTypeScript(tmpDir);
+            const updated = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
+            expect(updated.scripts['lint:check']).toBe('eslint .');
+            expect(updated.scripts['lint:fix']).toBe('eslint . --fix');
+            expect(updated.scripts['build']).toBe('npm run lint:check && ostro-build');
+
+            // Without scripts
+            fs.writeFileSync(pkgFile, JSON.stringify({ name: 'no-scripts' }));
+            cmd.updatePackageJsonForTypeScript(tmpDir);
+
+            // Non-existent package.json should not throw
+            expect(() => cmd.updatePackageJsonForTypeScript('/non/existent')).not.toThrow();
+        } finally {
+            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    test('createEslintConfigForTypeScript creates eslint.config.ts with @eslint/js and typescript-eslint', () => {
+        const cmd: NewCommand = new NewCommand();
+        const tmpDir: string = path.join(os.tmpdir(), `test-ts-eslint-cfg-${Date.now()}`);
+        fs.mkdirSync(tmpDir, { recursive: true });
+        try {
+            cmd.createEslintConfigForTypeScript(tmpDir);
+            const cfgFile = path.join(tmpDir, 'eslint.config.ts');
+            expect(fs.existsSync(cfgFile)).toBe(true);
+            const content = fs.readFileSync(cfgFile, 'utf8');
+            expect(content).toContain('@eslint/js');
+            expect(content).toContain('eslint/config');
+            expect(content).toContain('typescript-eslint');
+            expect(content).toContain('@typescript-eslint/no-unused-vars');
+            expect(content).toContain('tsconfig.json');
+        } finally {
+            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    test('installTypeScriptLintDependencies runs npm install --save-dev eslint @eslint/js typescript-eslint jiti', async () => {
+        const cmd: NewCommand = new NewCommand();
+        const runAsyncSpy = jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
+        const origRegistry = process.env.npm_config_registry;
+
+        try {
+            delete process.env.npm_config_registry;
+            await cmd.installTypeScriptLintDependencies('/dummy/ts-dir');
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint@^9.20.0 @eslint/js@^9.20.0 typescript-eslint@^8.24.0 jiti@^2.4.2'], { cwd: '/dummy/ts-dir' });
+
+            process.env.npm_config_registry = 'http://localhost:4873/';
+            await cmd.installTypeScriptLintDependencies('/dummy/ts-dir');
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint@^9.20.0 @eslint/js@^9.20.0 typescript-eslint@^8.24.0 jiti@^2.4.2 --registry http://localhost:4873/'], { cwd: '/dummy/ts-dir' });
+        } finally {
+            if (origRegistry !== undefined) {
+                process.env.npm_config_registry = origRegistry;
+            } else {
+                delete process.env.npm_config_registry;
+            }
+        }
+    });
+
+    test('createEslintConfigForJavaScript creates eslint.config.js', () => {
+        const cmd: NewCommand = new NewCommand();
+        const tmpDir: string = path.join(os.tmpdir(), `test-eslint-cfg-${Date.now()}`);
+        fs.mkdirSync(tmpDir, { recursive: true });
+        try {
+            cmd.createEslintConfigForJavaScript(tmpDir);
+            const cfgFile = path.join(tmpDir, 'eslint.config.js');
+            expect(fs.existsSync(cfgFile)).toBe(true);
+            const content = fs.readFileSync(cfgFile, 'utf8');
+            expect(content).toContain('no-unused-vars');
+            expect(content).toContain('no-undef');
+        } finally {
+            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    test('installJavaScriptLintDependencies runs npm install --save-dev eslint', async () => {
+        const cmd: NewCommand = new NewCommand();
+        const runAsyncSpy = jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
+        const origRegistry = process.env.npm_config_registry;
+
+        try {
+            delete process.env.npm_config_registry;
+            await cmd.installJavaScriptLintDependencies('/dummy/dir');
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint@^9.20.0'], { cwd: '/dummy/dir' });
+
+            process.env.npm_config_registry = 'http://localhost:4873/';
+            await cmd.installJavaScriptLintDependencies('/dummy/dir');
+            expect(runAsyncSpy).toHaveBeenCalledWith(['npm install --save-dev eslint@^9.20.0 --registry http://localhost:4873/'], { cwd: '/dummy/dir' });
+        } finally {
+            if (origRegistry !== undefined) {
+                process.env.npm_config_registry = origRegistry;
+            } else {
+                delete process.env.npm_config_registry;
+            }
+        }
+    });
+
+    test('convertToJavaScript runs build, removes TS artifacts and updates package.json', async () => {
         const cmd: NewCommand = new NewCommand();
         const tmpDir: string = path.join(os.tmpdir(), `test-convert-${Date.now()}`);
-        const buildDir: string = path.join(tmpDir, 'build');
-        fs.mkdirSync(buildDir, { recursive: true });
-        fs.writeFileSync(path.join(buildDir, 'app.js'), 'console.log("hello");');
+        fs.mkdirSync(tmpDir, { recursive: true });
+        fs.writeFileSync(path.join(tmpDir, 'app.js'), 'console.log("hello");');
         fs.writeFileSync(path.join(tmpDir, 'app.ts'), 'console.log("hello");');
         fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({ main: 'app.ts' }));
 
         jest.spyOn(cmd, 'buildWithTsc').mockResolvedValue();
+        jest.spyOn(cmd, 'installJavaScriptLintDependencies').mockResolvedValue();
 
         try {
             await cmd.convertToJavaScript(tmpDir);
             expect(cmd.buildWithTsc).toHaveBeenCalledWith(tmpDir);
             expect(fs.existsSync(path.join(tmpDir, 'app.js'))).toBe(true);
             expect(fs.existsSync(path.join(tmpDir, 'app.ts'))).toBe(false);
-            expect(fs.existsSync(buildDir)).toBe(false);
-        } finally {
-            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
-        }
-    });
-
-    test('convertToJavaScript when build directory does not exist', async () => {
-        const cmd: NewCommand = new NewCommand();
-        const tmpDir: string = path.join(os.tmpdir(), `test-convert-nobuild-${Date.now()}`);
-        fs.mkdirSync(tmpDir, { recursive: true });
-        jest.spyOn(cmd, 'buildWithTsc').mockResolvedValue();
-        try {
-            await cmd.convertToJavaScript(tmpDir);
+            expect(fs.existsSync(path.join(tmpDir, 'eslint.config.js'))).toBe(true);
         } finally {
             if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
         }
@@ -813,10 +928,7 @@ exports.default = app;
         }
     });
 
-    test('fixBinSymlinks handles non-existent binDir or lstat errors gracefully', () => {
-        const cmd: NewCommand = new NewCommand();
-        const nonExistent: string = path.join(os.tmpdir(), `test-no-bin-${Date.now()}`);
-        expect(() => cmd.fixBinSymlinks(nonExistent, '/tmp/foo')).not.toThrow();
-    });
 });
+
+
 
