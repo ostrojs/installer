@@ -812,8 +812,10 @@ class NewCommand extends Command {
         const content: string = [
             'module.exports = [',
             '    {',
+            '        ignores: ["node_modules/**", "public/**", "storage/**", ".dist/**", "build/**", "resources/assets/**"]',
+            '    },',
+            '    {',
             '        files: ["**/*.js"],',
-            '        ignores: ["node_modules/**", "public/**", "storage/**", ".dist/**", "build/**", "resources/assets/**"],',
             '        languageOptions: {',
             '            ecmaVersion: 2022,',
             '            sourceType: "commonjs",',
