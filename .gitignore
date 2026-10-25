@@ -4,4 +4,10 @@ build/
 AGY.md
 AYG.md
 
+.env
+.env.*
+js-app/
+my-app/
+custom_proj/
+
 package-lock.json
