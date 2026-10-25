@@ -1,3 +1,4 @@
+import { describe, test, expect, beforeEach, afterEach, jest } from "@jest/globals";
 describe('CLI Index Entry Point', () => {
     let originalArgv: string[];
     let originalExit: typeof process.exit;

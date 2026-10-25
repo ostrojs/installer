@@ -1,10 +1,10 @@
-import fs from 'fs';
-import child_process from 'child_process';
-import readline from 'readline';
-import os from 'os';
-import path from 'path';
+import fs from 'node:fs';
+import child_process from 'node:child_process';
+import readline from 'node:readline';
+import os from 'node:os';
+import path from 'node:path';
 import Command from '@ostro/console/command';
-import type { ExecOptions, ExecSyncOptions } from 'child_process';
+import type { ExecOptions, ExecSyncOptions } from 'node:child_process';
 
 interface NewCommand {
     input: {
@@ -221,7 +221,10 @@ class NewCommand extends Command {
                 } catch (_) { }
             }
             process.stdout.write('\n');
-            this.error(`\nInstallation failed: ${error.message}`);
+            let errorDetails = error.message;
+            if (error.stdout) errorDetails += '\n' + error.stdout.toString();
+            if (error.stderr) errorDetails += '\n' + error.stderr.toString();
+            this.error(`\nInstallation failed: ${errorDetails}`);
 
             if (directoryCreated && $directory !== '.') {
                 try {
@@ -354,7 +357,10 @@ class NewCommand extends Command {
             const cmd: string = commands.join(' && ');
             child_process.exec(cmd, { encoding: 'utf8', ...options }, (error: child_process.ExecException | null, stdout: string, stderr: string): void => {
                 if (error) {
-                    reject(new Error(stderr || error.message));
+                    const err: any = new Error(stderr || stdout || error.message);
+                    err.stdout = stdout;
+                    err.stderr = stderr;
+                    reject(err);
                 } else {
                     resolve(stdout);
                 }
@@ -796,12 +802,14 @@ class NewCommand extends Command {
             'export default defineConfig(',
             '    globalIgnores([',
             '        ...tsExcludes,',
+            "        '.dist/**',",
             "        'storage/**',",
             "        'public/**',",
             "        'build/**',",
             "        'resources/assets/**',",
-            "        'webpack.mix.ts',",
-            "        'eslint.config.ts'",
+            "        'webpack.mix.*',",
+            "        'eslint.config.*',",
+            "        'jest.config.*'",
             '    ]),',
             '    js.configs.recommended,',
             '    ...tseslint.configs.recommended,',
@@ -829,7 +837,7 @@ class NewCommand extends Command {
      */
     public async installTypeScriptLintDependencies(directory: string): Promise<void> {
         const registryFlag: string = process.env.npm_config_registry ? ` --registry ${process.env.npm_config_registry}` : '';
-        await this.runCommandsAsync([`npm install --save-dev eslint @eslint/js typescript-eslint jiti${registryFlag}`], { cwd: directory });
+        await this.runCommandsAsync([`npm install --save-dev eslint@^9.20.0 @eslint/js@^9.20.0 typescript-eslint@^8.24.0 jiti@^2.4.2${registryFlag}`], { cwd: directory });
     }
 
     /**
@@ -839,7 +847,7 @@ class NewCommand extends Command {
      */
     public async installJavaScriptLintDependencies(directory: string): Promise<void> {
         const registryFlag: string = process.env.npm_config_registry ? ` --registry ${process.env.npm_config_registry}` : '';
-        await this.runCommandsAsync([`npm install --save-dev eslint${registryFlag}`], { cwd: directory });
+        await this.runCommandsAsync([`npm install --save-dev eslint@^9.20.0${registryFlag}`], { cwd: directory });
     }
 
     /**
@@ -871,8 +879,5 @@ class NewCommand extends Command {
         }
     }
 }
-
-Object.defineProperty(NewCommand, '__esModule', { value: true });
-(NewCommand as any).default = NewCommand;
 
 export default NewCommand;

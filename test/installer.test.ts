@@ -1,9 +1,10 @@
-import child_process from 'child_process';
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
-import readline from 'readline';
-import { EventEmitter } from 'events';
+import { describe, test, expect, beforeEach, afterEach, jest } from "@jest/globals";
+import child_process from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import readline from 'node:readline';
+import { EventEmitter } from 'node:events';
 
 import NewCommand from '../src/newCommand';
 
@@ -154,7 +155,7 @@ describe('NewCommand', () => {
         jest.spyOn(cmd, 'updateSingleLine').mockImplementation(() => {});
 
         // 1. Success case
-        const mockChildSuccess = new EventEmitter() as any;
+        const mockChildSuccess = new EventEmitter() as unknown as import("child_process").ChildProcess;
         mockChildSuccess.stdout = new EventEmitter();
         mockChildSuccess.stderr = new EventEmitter();
 
@@ -177,7 +178,7 @@ describe('NewCommand', () => {
         await expect(promiseSuccess).resolves.toBeUndefined();
 
         // 2. Failure on close with non-zero code
-        const mockChildFail = new EventEmitter() as any;
+        const mockChildFail = new EventEmitter() as unknown as import("child_process").ChildProcess;
         mockChildFail.stdout = new EventEmitter();
         mockChildFail.stderr = new EventEmitter();
         (child_process.exec as unknown as jest.Mock).mockReturnValue(mockChildFail);
@@ -187,7 +188,7 @@ describe('NewCommand', () => {
         await expect(promiseFail).rejects.toThrow('npm install failed with exit code 1');
 
         // 3. Child error event
-        const mockChildErr = new EventEmitter() as any;
+        const mockChildErr = new EventEmitter() as unknown as import("child_process").ChildProcess;
         mockChildErr.stdout = new EventEmitter();
         mockChildErr.stderr = new EventEmitter();
         (child_process.exec as unknown as jest.Mock).mockReturnValue(mockChildErr);
@@ -248,7 +249,7 @@ describe('NewCommand', () => {
             });
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
 
             await cmd.handle();
@@ -287,7 +288,7 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'rmSync').mockImplementation(() => {});
             jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
             jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
@@ -323,7 +324,7 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
             jest.spyOn(fs, 'rmSync').mockImplementation(() => {
                 throw new Error('EPERM error');
@@ -356,7 +357,7 @@ describe('NewCommand', () => {
                 if (cmdStr.includes('npm v @ostro/ostro dist.tarball')) return 'https://registry.npmjs.org/tarball.tgz';
                 return '';
             });
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             const rmSyncSpy = jest.spyOn(fs, 'rmSync').mockImplementation(() => {});
             // Fail during runCommandsAsync (crafting step)
             jest.spyOn(cmd, 'runCommandsAsync').mockRejectedValue(new Error('Crafting failed'));
@@ -380,7 +381,7 @@ describe('NewCommand', () => {
 
             jest.spyOn(cmd, 'verifyApplicationDoesntExist').mockImplementation(() => {});
             jest.spyOn(cmd, 'runCommandsSync').mockReturnValue('1.0.0');
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
@@ -410,7 +411,7 @@ describe('NewCommand', () => {
 
             jest.spyOn(cmd, 'verifyApplicationDoesntExist').mockImplementation(() => {});
             jest.spyOn(cmd, 'runCommandsSync').mockReturnValue('1.0.0');
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'rmSync').mockImplementation(() => {
                 throw new Error('rmSync fail');
             });
@@ -445,7 +446,7 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
 
             await cmd.handle();
@@ -476,7 +477,7 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
             jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
             jest.spyOn(cmd, 'convertToJavaScript').mockResolvedValue(undefined);
@@ -510,7 +511,7 @@ describe('NewCommand', () => {
             jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
             jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
             jest.spyOn(cmd, 'replaceInFile').mockImplementation(() => {});
-            jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
+            jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
             jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
             jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
             jest.spyOn(cmd, 'convertToJavaScript').mockResolvedValue(undefined);
@@ -539,7 +540,7 @@ describe('NewCommand', () => {
         const cmd: NewCommand = new NewCommand();
         jest.spyOn(cmd, 'updateSingleLine').mockImplementation(() => {});
 
-        const mockChild = new EventEmitter() as any;
+        const mockChild = new EventEmitter() as unknown as import("child_process").ChildProcess;
         mockChild.stdout = new EventEmitter();
         mockChild.stderr = new EventEmitter();
         jest.spyOn(child_process, 'exec').mockReturnValue(mockChild);

@@ -1,35 +1,35 @@
 {
     "name": "@ostro/installer",
-    "version": "2.0.4-alpha.4",
+    "version": "2.0.0-alpha.8",
     "description": "Official CLI installer for the OstroJS framework",
     "main": "index.js",
-    "types": ".types/index.d.ts",
+    "types": ".typed/index.d.ts",
     "bin": {
         "ostro": "index.js",
         "craft": "index.js"
     },
     "exports": {
         ".": {
-            "types": "./.types/index.d.ts",
+            "types": "./.typed/index.d.ts",
             "default": "./index.js"
         },
         "./*": {
-            "types": "./.types/*.d.ts",
+            "types": "./.typed/*.d.ts",
             "default": "./*.js"
         }
     },
     "dependencies": {
-        "@ostro/console": "^2.0.0-alpha.10",
-        "@ostro/support": "^2.0.0-alpha.10",
+        "@ostro/console": "^2.0.0-alpha.3",
+        "@ostro/support": "^2.0.0-alpha.3",
         "ts-node": "^10.9.2",
         "typescript": "^5.8.0"
     },
     "scripts": {
-        "build": "npm run lint:check && npx tsc -p tsconfig.build.json && chmod +x build/index.js && node scripts/build.js",
+        "build": "npm run lint:check && rm -rf build && ostro-build --prepare",
         "prepublishOnly": "npm run build",
-        "test": "npx c8 npx jest",
+        "test": "jest",
         "clean": "rm -rf build coverage",
-        "lint:check": "tsc --noEmit -p tsconfig.build.json"
+        "lint:check": "tsc --noEmit"
     },
     "engines": {
         "node": ">=18.0.0"
@@ -56,7 +56,7 @@
     },
     "homepage": "https://github.com/ostrojs/installer#readme",
     "devDependencies": {
-        "@ostro/builder": "^2.0.0-alpha.7",
+        "@ostro/builder": "^2.0.0-alpha.1",
         "@types/jest": "^30.0.0",
         "@types/node": "^22.0.0",
         "c8": "^10.1.3",
