@@ -23,7 +23,7 @@ export default defineConfig(
         'public/**',
         'build/**',
         'resources/assets/**',
-        'webpack.mix.*',
+        'vite.config.*',
         'eslint.config.*',
         'jest.config.*'
     ]),

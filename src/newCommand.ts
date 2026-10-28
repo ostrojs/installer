@@ -477,7 +477,7 @@ class NewCommand extends Command {
         await this.installJavaScriptLintDependencies(directory);
         this.updateAssistantForJavaScript(directory);
         this.updateJestConfigForJavaScript(directory);
-        this.updateWebpackMixForJavaScript(directory);
+        this.updateViteForJavaScript(directory);
     }
 
     /**
@@ -551,25 +551,41 @@ class NewCommand extends Command {
     }
 
     /**
-     * Update Webpack Mix configuration for pure JavaScript mode.
+     * Update Vite configuration for pure JavaScript mode.
      *
      * @param directory - Application root directory path.
      */
-    public updateWebpackMixForJavaScript(directory: string): void {
-        const configPath: string = path.join(directory, 'webpack.mix.js');
+    public updateViteForJavaScript(directory: string): void {
+        const configPath: string = path.join(directory, 'vite.config.js');
         const content: string = [
-            "const mix = require('laravel-mix');",
+            "import { defineConfig } from 'vite';",
+            "import ostro from '@ostro/vite';",
             '',
-            "mix.js('resources/assets/js/app.js', 'public/js')",
-            "    .postCss('resources/assets/css/app.css', 'public/css', [",
-            '        //',
-            '    ]);',
+            'export default defineConfig({',
+            '    plugins: [',
+            '        ostro({',
+            '            input: [',
+            "                'resources/assets/css/app.css',",
+            "                'resources/assets/js/app.js',",
+            '            ],',
+            '            refresh: true,',
+            '        }),',
+            '    ],',
+            '});',
             ''
         ].join('\n');
         fs.writeFileSync(configPath, content, 'utf8');
         try {
-            const tsMixConfig = path.join(directory, 'webpack.mix.ts');
-            if (fs.existsSync(tsMixConfig)) fs.unlinkSync(tsMixConfig);
+            const tsViteConfig = path.join(directory, 'vite.config.ts');
+            if (fs.existsSync(tsViteConfig)) fs.unlinkSync(tsViteConfig);
+        } catch (_) { }
+        try {
+            const legacyMixTs = path.join(directory, 'webpack.mix.ts');
+            if (fs.existsSync(legacyMixTs)) fs.unlinkSync(legacyMixTs);
+        } catch (_) { }
+        try {
+            const legacyMixJs = path.join(directory, 'webpack.mix.js');
+            if (fs.existsSync(legacyMixJs)) fs.unlinkSync(legacyMixJs);
         } catch (_) { }
     }
 
@@ -756,6 +772,13 @@ class NewCommand extends Command {
         if (pkg.scripts) {
             pkg.scripts['lint:check'] = 'eslint .';
             pkg.scripts['lint:fix'] = 'eslint . --fix';
+            pkg.scripts['dev'] = 'npm run development';
+            pkg.scripts['development'] = 'vite build';
+            pkg.scripts['watch'] = 'vite build --watch';
+            pkg.scripts['watch-poll'] = 'vite build --watch';
+            pkg.scripts['vite'] = 'vite';
+            pkg.scripts['prod'] = 'npm run production';
+            pkg.scripts['production'] = 'vite build';
             pkg.scripts['build'] = 'npm run lint:check && ostro-build';
         }
         fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
@@ -779,12 +802,15 @@ class NewCommand extends Command {
             delete pkg.scripts['start:prod'];
             pkg.scripts['lint:check'] = 'eslint .';
             pkg.scripts['lint:fix'] = 'eslint . --fix';
+            pkg.scripts['dev'] = 'npm run development';
+            pkg.scripts['development'] = 'vite build';
+            pkg.scripts['watch'] = 'vite build --watch';
+            pkg.scripts['watch-poll'] = 'vite build --watch';
+            pkg.scripts['vite'] = 'vite';
+            pkg.scripts['prod'] = 'npm run production';
+            pkg.scripts['production'] = 'vite build';
             pkg.scripts['build'] = 'npm run lint:check';
             pkg.scripts['server:start'] = 'node app.js';
-            pkg.scripts['development'] = 'mix';
-            pkg.scripts['watch'] = 'mix watch';
-            pkg.scripts['watch-poll'] = 'mix watch -- --watch-options-poll=1000';
-            pkg.scripts['hot'] = 'mix watch --hot';
         }
         if (pkg.devDependencies) {
             delete pkg.devDependencies.typescript;
@@ -880,7 +906,7 @@ class NewCommand extends Command {
             "        'public/**',",
             "        'build/**',",
             "        'resources/assets/**',",
-            "        'webpack.mix.*',",
+            "        'vite.config.*',",
             "        'eslint.config.*',",
             "        'jest.config.*'",
             '    ]),',

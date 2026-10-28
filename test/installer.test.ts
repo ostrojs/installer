@@ -644,6 +644,13 @@ describe('NewCommand', () => {
             expect(updated.scripts.build).toBe('npm run lint:check');
             expect(updated.scripts['lint:check']).toBe('eslint .');
             expect(updated.scripts['lint:fix']).toBe('eslint . --fix');
+            expect(updated.scripts['dev']).toBe('npm run development');
+            expect(updated.scripts['development']).toBe('vite build');
+            expect(updated.scripts['watch']).toBe('vite build --watch');
+            expect(updated.scripts['watch-poll']).toBe('vite build --watch');
+            expect(updated.scripts['vite']).toBe('vite');
+            expect(updated.scripts['prod']).toBe('npm run production');
+            expect(updated.scripts['production']).toBe('vite build');
             expect(updated.scripts['build:clean']).toBeUndefined();
             expect(updated.scripts['start:prod']).toBeUndefined();
             expect(updated.scripts.start).toBeUndefined();
@@ -686,6 +693,13 @@ describe('NewCommand', () => {
             const updated = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
             expect(updated.scripts['lint:check']).toBe('eslint .');
             expect(updated.scripts['lint:fix']).toBe('eslint . --fix');
+            expect(updated.scripts['dev']).toBe('npm run development');
+            expect(updated.scripts['development']).toBe('vite build');
+            expect(updated.scripts['watch']).toBe('vite build --watch');
+            expect(updated.scripts['watch-poll']).toBe('vite build --watch');
+            expect(updated.scripts['vite']).toBe('vite');
+            expect(updated.scripts['prod']).toBe('npm run production');
+            expect(updated.scripts['production']).toBe('vite build');
             expect(updated.scripts['build']).toBe('npm run lint:check && ostro-build');
 
             // Without scripts
@@ -795,6 +809,30 @@ describe('NewCommand', () => {
             expect(fs.existsSync(path.join(tmpDir, 'app.js'))).toBe(true);
             expect(fs.existsSync(path.join(tmpDir, 'app.ts'))).toBe(false);
             expect(fs.existsSync(path.join(tmpDir, 'eslint.config.js'))).toBe(true);
+            expect(fs.existsSync(path.join(tmpDir, 'vite.config.js'))).toBe(true);
+        } finally {
+            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    test('updateViteForJavaScript creates vite.config.js and removes ts and mix configs', () => {
+        const cmd: NewCommand = new NewCommand();
+        const tmpDir: string = path.join(os.tmpdir(), `test-vite-cfg-${Date.now()}`);
+        fs.mkdirSync(tmpDir, { recursive: true });
+        fs.writeFileSync(path.join(tmpDir, 'vite.config.ts'), 'export default {};');
+        fs.writeFileSync(path.join(tmpDir, 'webpack.mix.ts'), 'export default {};');
+        fs.writeFileSync(path.join(tmpDir, 'webpack.mix.js'), 'module.exports = {};');
+
+        try {
+            cmd.updateViteForJavaScript(tmpDir);
+            const cfgFile = path.join(tmpDir, 'vite.config.js');
+            expect(fs.existsSync(cfgFile)).toBe(true);
+            const content = fs.readFileSync(cfgFile, 'utf8');
+            expect(content).toContain('@ostro/vite');
+            expect(content).toContain('resources/assets/js/app.js');
+            expect(fs.existsSync(path.join(tmpDir, 'vite.config.ts'))).toBe(false);
+            expect(fs.existsSync(path.join(tmpDir, 'webpack.mix.ts'))).toBe(false);
+            expect(fs.existsSync(path.join(tmpDir, 'webpack.mix.js'))).toBe(false);
         } finally {
             if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
         }
