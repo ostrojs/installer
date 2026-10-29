@@ -1130,10 +1130,19 @@ exports.default = app;
                 fs.mkdirSync(path.join(tmpDir, rel), { recursive: true });
             }
 
+            // Setup public dir
+            const publicDir = path.join(tmpDir, 'public');
+            fs.mkdirSync(publicDir, { recursive: true });
+
             cmd.ensureGitignoreFiles(tmpDir);
 
             // Verify root .gitignore created
             expect(fs.existsSync(path.join(tmpDir, '.gitignore'))).toBe(true);
+            const rootGitignoreContent = fs.readFileSync(path.join(tmpDir, '.gitignore'), 'utf8');
+            expect(rootGitignoreContent).toContain('/.dist');
+            expect(rootGitignoreContent).toContain('.env.example');
+            // Verify public/.gitignore created
+            expect(fs.existsSync(path.join(publicDir, '.gitignore'))).toBe(true);
             // Verify database/.gitignore created and gitignore removed
             expect(fs.existsSync(path.join(subDir, '.gitignore'))).toBe(true);
             expect(fs.existsSync(path.join(subDir, 'gitignore'))).toBe(false);
@@ -1149,10 +1158,12 @@ exports.default = app;
             cmd.ensureGitignoreFiles(tmpDir);
             expect(fs.readFileSync(path.join(subDir, '.gitignore'), 'utf8')).toBe('*.sqlite*\n');
 
-            // Third pass: delete database/.gitignore to exercise line 1115 (fs.writeFileSync for dbGitignore)
+            // Third pass: delete database/.gitignore and public/.gitignore to exercise creation branches
             fs.unlinkSync(path.join(subDir, '.gitignore'));
+            fs.unlinkSync(path.join(publicDir, '.gitignore'));
             cmd.ensureGitignoreFiles(tmpDir);
             expect(fs.existsSync(path.join(subDir, '.gitignore'))).toBe(true);
+            expect(fs.existsSync(path.join(publicDir, '.gitignore'))).toBe(true);
         } finally {
             fs.rmSync(tmpDir, { recursive: true, force: true });
         }

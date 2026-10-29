@@ -1082,13 +1082,12 @@ class NewCommand extends Command {
         const rootGitignore = path.join(directory, '.gitignore');
         if (!fs.existsSync(rootGitignore)) {
             const defaultRoot = [
+                '/.dist',
                 '/node_modules',
-                '/public/build',
-                '/public/hot',
-                '/public/storage',
                 '/storage/*.key',
                 '.env',
                 '.env.backup',
+                '.env.example',
                 '*.log',
                 '.DS_Store',
                 'Thumbs.db',
@@ -1105,6 +1104,15 @@ class NewCommand extends Command {
                 ''
             ].join('\n');
             fs.writeFileSync(rootGitignore, defaultRoot);
+        }
+
+        // Ensure public/.gitignore
+        const publicDir = path.join(directory, 'public');
+        if (fs.existsSync(publicDir)) {
+            const publicGitignore = path.join(publicDir, '.gitignore');
+            if (!fs.existsSync(publicGitignore)) {
+                fs.writeFileSync(publicGitignore, '/build\n/hot\n/storage\n');
+            }
         }
 
         // Ensure database/.gitignore
