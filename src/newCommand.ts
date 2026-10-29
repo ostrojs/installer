@@ -600,6 +600,7 @@ class NewCommand extends Command {
                 'export default defineConfig({',
                 '    plugins: [',
                 '        ostro({',
+                "            buildDirectory: 'build',",
                 '            input: [',
                 "                'resources/assets/css/app.css',",
                 `                '${scriptEntry}',`,
