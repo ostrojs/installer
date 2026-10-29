@@ -1082,18 +1082,15 @@ class NewCommand extends Command {
         const rootGitignore = path.join(directory, '.gitignore');
         if (!fs.existsSync(rootGitignore)) {
             const defaultRoot = [
-                '*.log',
-                '.DS_Store',
-                '.env',
-                '.env.backup',
                 '/node_modules',
                 '/public/build',
                 '/public/hot',
                 '/public/storage',
                 '/storage/*.key',
-                '/storage/framework',
-                '/storage/logs/',
-                '/storage/app',
+                '.env',
+                '.env.backup',
+                '*.log',
+                '.DS_Store',
                 'Thumbs.db',
                 'npm-debug.log',
                 'yarn-error.log',
