@@ -35,7 +35,7 @@ describe('NewCommand', () => {
         const cmd: NewCommand = new NewCommand();
         expect(cmd.$signature).toBe('new');
         expect(cmd.$description).toBe('Create a new OstroJS application');
-        expect(cmd.$options.length).toBe(3);
+        expect(cmd.$options.length).toBe(4);
         expect(cmd.$arguments.length).toBe(2);
     });
 
@@ -663,6 +663,20 @@ describe('NewCommand', () => {
             expect(updated.devDependencies.eslint).toBeDefined();
             expect(updated.devDependencies.other).toBe('1.0.0');
 
+            // When builder is mix
+            cmd.updatePackageJsonForJavaScript(tmpDir, 'mix');
+            const mixUpdated = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
+            expect(mixUpdated.scripts['development']).toBe('mix --mix-config=webpack.mix.js');
+            expect(mixUpdated.scripts['watch']).toBe('mix watch --mix-config=webpack.mix.js');
+            expect(mixUpdated.scripts['watch-poll']).toContain('--watch-options-poll=1000');
+            expect(mixUpdated.scripts['hot']).toBe('mix watch --hot --mix-config=webpack.mix.js');
+            expect(mixUpdated.scripts['production']).toBe('mix --production --mix-config=webpack.mix.js');
+            expect(mixUpdated.scripts['vite']).toBeUndefined();
+            expect(mixUpdated.devDependencies['@ostro/mix']).toBe('^2.0.0-alpha.1');
+            expect(mixUpdated.devDependencies['webpack']).toBe('5.99.9');
+            expect(mixUpdated.devDependencies['@ostro/vite']).toBeUndefined();
+            expect(mixUpdated.devDependencies['vite']).toBeUndefined();
+
             // When scripts and devDependencies are missing
             const emptyPkgFile = path.join(tmpDir, 'package.json');
             fs.writeFileSync(emptyPkgFile, JSON.stringify({ main: 'app.ts' }));
@@ -685,11 +699,15 @@ describe('NewCommand', () => {
         fs.writeFileSync(pkgFile, JSON.stringify({
             scripts: {
                 build: 'ostro-build'
+            },
+            devDependencies: {
+                '@ostro/vite': '^2.0.0',
+                'vite': '^6.2.0'
             }
         }));
 
         try {
-            cmd.updatePackageJsonForTypeScript(tmpDir);
+            cmd.updatePackageJsonForTypeScript(tmpDir, 'vite');
             const updated = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
             expect(updated.scripts['lint:check']).toBe('eslint .');
             expect(updated.scripts['lint:fix']).toBe('eslint . --fix');
@@ -702,9 +720,24 @@ describe('NewCommand', () => {
             expect(updated.scripts['production']).toBe('vite build');
             expect(updated.scripts['build']).toBe('npm run lint:check && ostro-build');
 
-            // Without scripts
+            // With builder = mix
+            cmd.updatePackageJsonForTypeScript(tmpDir, 'mix');
+            const mixUpdated = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
+            expect(mixUpdated.scripts['development']).toBe('mix --mix-config=webpack.mix.ts');
+            expect(mixUpdated.scripts['watch']).toBe('mix watch --mix-config=webpack.mix.ts');
+            expect(mixUpdated.scripts['watch-poll']).toContain('--watch-options-poll=1000');
+            expect(mixUpdated.scripts['hot']).toBe('mix watch --hot --mix-config=webpack.mix.ts');
+            expect(mixUpdated.scripts['production']).toBe('mix --production --mix-config=webpack.mix.ts');
+            expect(mixUpdated.scripts['vite']).toBeUndefined();
+            expect(mixUpdated.devDependencies['@ostro/mix']).toBe('^2.0.0-alpha.1');
+            expect(mixUpdated.devDependencies['webpack']).toBe('5.99.9');
+            expect(mixUpdated.devDependencies['ts-loader']).toBe('^9.5.2');
+            expect(mixUpdated.devDependencies['@ostro/vite']).toBeUndefined();
+            expect(mixUpdated.devDependencies['vite']).toBeUndefined();
+
+            // Without scripts and devDependencies for mix
             fs.writeFileSync(pkgFile, JSON.stringify({ name: 'no-scripts' }));
-            cmd.updatePackageJsonForTypeScript(tmpDir);
+            cmd.updatePackageJsonForTypeScript(tmpDir, 'mix');
 
             // Non-existent package.json should not throw
             expect(() => cmd.updatePackageJsonForTypeScript('/non/existent')).not.toThrow();
@@ -804,7 +837,7 @@ describe('NewCommand', () => {
         jest.spyOn(cmd, 'installJavaScriptLintDependencies').mockResolvedValue();
 
         try {
-            await cmd.convertToJavaScript(tmpDir);
+            await cmd.convertToJavaScript(tmpDir, 'vite');
             expect(cmd.buildWithTsc).toHaveBeenCalledWith(tmpDir);
             expect(fs.existsSync(path.join(tmpDir, 'app.js'))).toBe(true);
             expect(fs.existsSync(path.join(tmpDir, 'app.ts'))).toBe(false);
@@ -815,24 +848,41 @@ describe('NewCommand', () => {
         }
     });
 
-    test('updateViteForJavaScript creates vite.config.js and removes ts and mix configs', () => {
+    test('configureAssetPipeline creates vite or mix config and removes alternatives', () => {
         const cmd: NewCommand = new NewCommand();
-        const tmpDir: string = path.join(os.tmpdir(), `test-vite-cfg-${Date.now()}`);
+        const tmpDir: string = path.join(os.tmpdir(), `test-asset-pipeline-${Date.now()}`);
         fs.mkdirSync(tmpDir, { recursive: true });
-        fs.writeFileSync(path.join(tmpDir, 'vite.config.ts'), 'export default {};');
-        fs.writeFileSync(path.join(tmpDir, 'webpack.mix.ts'), 'export default {};');
-        fs.writeFileSync(path.join(tmpDir, 'webpack.mix.js'), 'module.exports = {};');
 
         try {
-            cmd.updateViteForJavaScript(tmpDir);
-            const cfgFile = path.join(tmpDir, 'vite.config.js');
-            expect(fs.existsSync(cfgFile)).toBe(true);
-            const content = fs.readFileSync(cfgFile, 'utf8');
-            expect(content).toContain('@ostro/vite');
-            expect(content).toContain('resources/assets/js/app.js');
+            // Test 1: JS + Vite
+            fs.writeFileSync(path.join(tmpDir, 'vite.config.ts'), 'export default {};');
+            fs.writeFileSync(path.join(tmpDir, 'webpack.mix.ts'), 'export default {};');
+            fs.writeFileSync(path.join(tmpDir, 'webpack.mix.js'), 'module.exports = {};');
+            cmd.configureAssetPipeline(tmpDir, 'js', 'vite');
+            expect(fs.existsSync(path.join(tmpDir, 'vite.config.js'))).toBe(true);
+            expect(fs.readFileSync(path.join(tmpDir, 'vite.config.js'), 'utf8')).toContain('@ostro/vite');
             expect(fs.existsSync(path.join(tmpDir, 'vite.config.ts'))).toBe(false);
             expect(fs.existsSync(path.join(tmpDir, 'webpack.mix.ts'))).toBe(false);
             expect(fs.existsSync(path.join(tmpDir, 'webpack.mix.js'))).toBe(false);
+
+            // Test 2: TS + Vite
+            cmd.configureAssetPipeline(tmpDir, 'ts', 'vite');
+            expect(fs.existsSync(path.join(tmpDir, 'vite.config.ts'))).toBe(true);
+            expect(fs.readFileSync(path.join(tmpDir, 'vite.config.ts'), 'utf8')).toContain("app.ts");
+            expect(fs.existsSync(path.join(tmpDir, 'vite.config.js'))).toBe(false);
+
+            // Test 3: TS + Mix
+            cmd.configureAssetPipeline(tmpDir, 'ts', 'mix');
+            expect(fs.existsSync(path.join(tmpDir, 'webpack.mix.ts'))).toBe(true);
+            expect(fs.readFileSync(path.join(tmpDir, 'webpack.mix.ts'), 'utf8')).toContain("@ostro/mix");
+            expect(fs.readFileSync(path.join(tmpDir, 'webpack.mix.ts'), 'utf8')).toContain("mix.ts('resources/assets/js/app.ts'");
+            expect(fs.existsSync(path.join(tmpDir, 'vite.config.ts'))).toBe(false);
+
+            // Test 4: JS + Mix
+            cmd.configureAssetPipeline(tmpDir, 'js', 'mix');
+            expect(fs.existsSync(path.join(tmpDir, 'webpack.mix.js'))).toBe(true);
+            expect(fs.readFileSync(path.join(tmpDir, 'webpack.mix.js'), 'utf8')).toContain("mix.js('resources/assets/js/app.js'");
+            expect(fs.existsSync(path.join(tmpDir, 'webpack.mix.ts'))).toBe(false);
         } finally {
             if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
         }
@@ -842,6 +892,16 @@ describe('NewCommand', () => {
         const cmd: NewCommand = new NewCommand();
         const tscCmd = cmd.getTscCommand();
         expect(tscCmd).toContain('tsc');
+
+        // Test fallback catch path for getTscCommand
+        jest.spyOn(cmd, 'resolveModule').mockImplementation(() => {
+            throw new Error('not found');
+        });
+        expect(cmd.getTscCommand()).toBe('npx tsc');
+        (cmd.resolveModule as unknown as jest.Mock).mockRestore();
+
+        // Test resolveModule calls require.resolve
+        expect(cmd.resolveModule('typescript/bin/tsc')).toContain('tsc');
 
         const tmpDir: string = path.join(os.tmpdir(), `test-tsc-build-${Date.now()}`);
         fs.mkdirSync(tmpDir, { recursive: true });
@@ -966,6 +1026,137 @@ exports.default = app;
         }
     });
 
+    test('cleanCompiledFile handles reserved words and Helper methods', () => {
+        const cmd: NewCommand = new NewCommand();
+        const input: string = [
+            'const default_1 = require("default-mod");',
+            'const math = require("math");',
+            'const val = default_1.value;',
+            'const direct = (0, mathHelper.compute)();'
+        ].join('\n');
+        const output = cmd.cleanCompiledFile(input);
+        expect(output).toContain('const defaultHelper = require("default-mod");');
+        expect(output).toContain('defaultHelper.value;');
+        expect(output).toContain('compute();');
+    });
+
+    test('convertToJavaScript handles existing .dist directory and builder mix', async () => {
+        const cmd: NewCommand = new NewCommand();
+        const tmpDir: string = path.join(os.tmpdir(), `test-convert-dist-${Date.now()}`);
+        const distDir: string = path.join(tmpDir, '.dist');
+        fs.mkdirSync(distDir, { recursive: true });
+        fs.writeFileSync(path.join(distDir, 'index.js'), 'module.exports = 1;');
+        fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({ scripts: {}, devDependencies: {} }));
+
+        jest.spyOn(cmd, 'buildWithTsc').mockResolvedValue();
+        jest.spyOn(cmd, 'installJavaScriptLintDependencies').mockResolvedValue();
+
+        try {
+            await cmd.convertToJavaScript(tmpDir, 'mix');
+            expect(fs.existsSync(distDir)).toBe(false);
+            expect(fs.existsSync(path.join(tmpDir, 'index.js'))).toBe(true);
+            expect(fs.existsSync(path.join(tmpDir, 'webpack.mix.js'))).toBe(true);
+        } finally {
+            if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
+
+    test('handle executes with builder mix and format ts', async () => {
+        const cmd: NewCommand = new NewCommand();
+        cmd.output = { writeln: jest.fn(), write: jest.fn() };
+        cmd.error = jest.fn();
+        cmd.info = jest.fn();
+        cmd.input = {
+            getArgument: jest.fn().mockImplementation((arg: string) => arg === 'name' ? 'mix-app' : ''),
+            getOption: jest.fn().mockImplementation((opt: string) => {
+                if (opt === 'format') return 'ts';
+                if (opt === 'builder') return 'mix';
+                return false;
+            })
+        };
+
+        jest.spyOn(os, 'type').mockReturnValue('Linux');
+        jest.spyOn(cmd, 'verifyApplicationDoesntExist').mockImplementation(() => {});
+        jest.spyOn(cmd, 'runCommandsSync').mockImplementation((cmds: string[]): any => {
+            const cmdStr: string = cmds[0];
+            if (cmdStr.includes('npm show @ostro/installer version')) return '1.0.6';
+            if (cmdStr.includes('npm ls @ostro/installer -g version')) return '@ostro/installer@1.0.6';
+            if (cmdStr.includes('npm v @ostro/ostro dist.tarball')) return 'https://tarball.tgz';
+            return '';
+        });
+        jest.spyOn(cmd, 'runCommandsAsync').mockResolvedValue('ok');
+        jest.spyOn(cmd, 'runNpmInstallWithRealtimeLog').mockResolvedValue(undefined);
+        jest.spyOn(cmd, 'installTypeScriptLintDependencies').mockResolvedValue(undefined);
+        jest.spyOn(cmd, 'buildWithTsc').mockResolvedValue(undefined);
+        jest.spyOn(cmd, 'configureAssetPipeline').mockImplementation(() => {});
+        jest.spyOn(cmd, 'updatePackageJsonForTypeScript').mockImplementation(() => {});
+        jest.spyOn(cmd, 'createEslintConfigForTypeScript').mockImplementation(() => {});
+        jest.spyOn(fs, 'mkdirSync').mockImplementation((() => undefined) as unknown as typeof fs.mkdirSync);
+        jest.spyOn(fs, 'copyFileSync').mockImplementation(() => {});
+        jest.spyOn(fs, 'cpSync').mockImplementation(() => {});
+
+        await cmd.handle();
+
+        expect(cmd.configureAssetPipeline).toHaveBeenCalledWith(expect.any(String), 'ts', 'mix');
+        expect(cmd.updatePackageJsonForTypeScript).toHaveBeenCalledWith(expect.any(String), 'mix');
+        expect(cmd.info).toHaveBeenCalledWith('Application ready at destination (TS)');
+    });
+
+    test('ensureGitignoreFiles restores gitignore files and handles existing ones', () => {
+        const cmd: NewCommand = new NewCommand();
+        const tmpDir: string = fs.mkdtempSync(path.join(os.tmpdir(), 'test-gitignore-'));
+        try {
+            // Test non-existent sub-dir early return
+            cmd.ensureGitignoreFiles(path.join(tmpDir, 'does-not-exist'));
+
+            // Setup test folder structure with a gitignore file to be converted
+            const subDir = path.join(tmpDir, 'database');
+            fs.mkdirSync(subDir, { recursive: true });
+            fs.writeFileSync(path.join(subDir, 'gitignore'), '*.sqlite*\n');
+
+            // Setup storage dirs
+            const storageDirs = [
+                'storage/app',
+                'storage/app/public',
+                'storage/framework',
+                'storage/framework/cache',
+                'storage/framework/cache/data',
+                'storage/framework/sessions',
+                'storage/framework/testing',
+                'storage/framework/views',
+                'storage/logs'
+            ];
+            for (const rel of storageDirs) {
+                fs.mkdirSync(path.join(tmpDir, rel), { recursive: true });
+            }
+
+            cmd.ensureGitignoreFiles(tmpDir);
+
+            // Verify root .gitignore created
+            expect(fs.existsSync(path.join(tmpDir, '.gitignore'))).toBe(true);
+            // Verify database/.gitignore created and gitignore removed
+            expect(fs.existsSync(path.join(subDir, '.gitignore'))).toBe(true);
+            expect(fs.existsSync(path.join(subDir, 'gitignore'))).toBe(false);
+
+            // Verify storage .gitignore files
+            for (const rel of storageDirs) {
+                expect(fs.existsSync(path.join(tmpDir, rel, '.gitignore'))).toBe(true);
+            }
+
+            // Second pass: test when .gitignore files already exist (branches where files exist)
+            // Also test branch where gitignore exists alongside .gitignore
+            fs.writeFileSync(path.join(subDir, 'gitignore'), 'duplicate\n');
+            cmd.ensureGitignoreFiles(tmpDir);
+            expect(fs.readFileSync(path.join(subDir, '.gitignore'), 'utf8')).toBe('*.sqlite*\n');
+
+            // Third pass: delete database/.gitignore to exercise line 1115 (fs.writeFileSync for dbGitignore)
+            fs.unlinkSync(path.join(subDir, '.gitignore'));
+            cmd.ensureGitignoreFiles(tmpDir);
+            expect(fs.existsSync(path.join(subDir, '.gitignore'))).toBe(true);
+        } finally {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+    });
 });
 
 

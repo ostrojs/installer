@@ -45,7 +45,8 @@ class NewCommand extends Command {
         return [
             this.createOption('--dev', 'Installs the latest "development" release'),
             this.createOption('--force', 'Forces install even if the directory already exists').default(false),
-            this.createOption('--format <type>', 'Format of the application framework (js or ts)').default('ts').choices(['js', 'ts'])
+            this.createOption('--format <type>', 'Format of the application framework (js or ts)').default('ts').choices(['js', 'ts']),
+            this.createOption('--builder <type>', 'Frontend asset bundler (vite or mix)').default('vite').choices(['vite', 'mix'])
         ];
     }
 
@@ -117,6 +118,9 @@ class NewCommand extends Command {
             const chosenFormat: string = (formatArg === 'js' || formatArg === 'ts') ? formatArg : formatOption;
             const format: 'js' | 'ts' = chosenFormat === 'js' ? 'js' : 'ts';
 
+            const builderOption: string = String(this.input.getOption('builder') || 'vite').toLowerCase();
+            const builder: 'vite' | 'mix' = builderOption === 'mix' ? 'mix' : 'vite';
+
             const osType: string = os.type();
             if ($directory !== '.' && this.input.getOption('force')) {
                 try {
@@ -151,6 +155,10 @@ class NewCommand extends Command {
 
             this.startSpinner('[2/7]', 'Crafting application in staging...');
             await this.runCommandsAsync($commands, { cwd: tempWorkingDir });
+
+            // Restore all .gitignore files (including root and subdirectories)
+            this.ensureGitignoreFiles(tempWorkingDir);
+
             this.stopSpinnerAndClear();
             this.output.write('[2/7] ');
             this.info('Application crafted');
@@ -172,13 +180,14 @@ class NewCommand extends Command {
 
             if (format === 'js') {
                 this.startSpinner('[5/7]', 'Building & converting to pure JavaScript...');
-                await this.convertToJavaScript(tempWorkingDir);
+                await this.convertToJavaScript(tempWorkingDir, builder);
                 this.stopSpinnerAndClear();
                 this.output.write('[5/7] ');
                 this.info('Pure JavaScript framework built');
             } else {
                 this.startSpinner('[5/7]', 'Building TypeScript framework...');
-                this.updatePackageJsonForTypeScript(tempWorkingDir);
+                this.configureAssetPipeline(tempWorkingDir, 'ts', builder);
+                this.updatePackageJsonForTypeScript(tempWorkingDir, builder);
                 this.createEslintConfigForTypeScript(tempWorkingDir);
                 await this.installTypeScriptLintDependencies(tempWorkingDir);
                 await this.buildWithTsc(tempWorkingDir);
@@ -309,7 +318,8 @@ class NewCommand extends Command {
      */
     public runNpmInstallWithRealtimeLog(directory: string, prefix: string): Promise<void> {
         return new Promise<void>((resolve, reject): void => {
-            const child: child_process.ChildProcess = child_process.exec('npm install', { cwd: directory });
+            const registryFlag: string = process.env.npm_config_registry ? ` --registry ${process.env.npm_config_registry}` : '';
+            const child: child_process.ChildProcess = child_process.exec(`npm install${registryFlag}`, { cwd: directory });
             const frames: readonly string[] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
             let i: number = 0;
             let lastLogLine: string = 'Starting npm install...';
@@ -414,7 +424,7 @@ class NewCommand extends Command {
      */
     public getTscCommand(): string {
         try {
-            const tscPath: string = require.resolve('typescript/bin/tsc');
+            const tscPath: string = this.resolveModule('typescript/bin/tsc');
             return `"${process.execPath}" "${tscPath}"`;
         } catch (_) {
             return 'npx tsc';
@@ -422,27 +432,13 @@ class NewCommand extends Command {
     }
 
     /**
-     * Resolves the ts-node binary path from the installed dependencies.
+     * Resolve a module identifier path.
      *
-     * @param directory - Application root directory path.
-     * @returns Full executable command for ts-node.
+     * @param moduleId - Module specifier to resolve.
+     * @returns Resolved module filesystem path.
      */
-    public getTsNodeCommand(directory: string): string {
-        const localTsNodeBin: string = path.join(directory, 'node_modules', '.bin', process.platform === 'win32' ? 'ts-node.cmd' : 'ts-node');
-        if (fs.existsSync(localTsNodeBin)) {
-            return `"${localTsNodeBin}"`;
-        }
-        try {
-            const tsNodeDistPath: string = require.resolve('ts-node/dist/bin.js', { paths: [directory] });
-            return `"${process.execPath}" "${tsNodeDistPath}"`;
-        } catch (_) {
-            try {
-                const tsNodePath: string = require.resolve('ts-node/dist/bin.js');
-                return `"${process.execPath}" "${tsNodePath}"`;
-            } catch (_) {
-                return 'ts-node';
-            }
-        }
+    public resolveModule(moduleId: string): string {
+        return require.resolve(moduleId);
     }
 
     /**
@@ -462,8 +458,9 @@ class NewCommand extends Command {
      * Converts a scaffolded OstroJS application to pure JavaScript.
      *
      * @param directory - Application root directory path.
+     * @param builder - Asset bundler ('vite' or 'mix').
      */
-    public async convertToJavaScript(directory: string): Promise<void> {
+    public async convertToJavaScript(directory: string, builder: 'vite' | 'mix' = 'vite'): Promise<void> {
         await this.buildWithTsc(directory);
         const distDir: string = path.join(directory, '.dist');
         if (fs.existsSync(distDir)) {
@@ -472,12 +469,12 @@ class NewCommand extends Command {
         }
         this.cleanJavaScriptArtifacts(directory);
         this.removeTypeScriptArtifacts(directory);
-        this.updatePackageJsonForJavaScript(directory);
+        this.configureAssetPipeline(directory, 'js', builder);
+        this.updatePackageJsonForJavaScript(directory, builder);
         this.createEslintConfigForJavaScript(directory);
         await this.installJavaScriptLintDependencies(directory);
         this.updateAssistantForJavaScript(directory);
         this.updateJestConfigForJavaScript(directory);
-        this.updateViteForJavaScript(directory);
     }
 
     /**
@@ -551,42 +548,79 @@ class NewCommand extends Command {
     }
 
     /**
-     * Update Vite configuration for pure JavaScript mode.
+     * Configure asset pipeline (Vite or Laravel Mix) for JavaScript or TypeScript mode.
      *
      * @param directory - Application root directory path.
+     * @param format - 'js' or 'ts'.
+     * @param builder - 'vite' or 'mix'.
      */
-    public updateViteForJavaScript(directory: string): void {
-        const configPath: string = path.join(directory, 'vite.config.js');
-        const content: string = [
-            "import { defineConfig } from 'vite';",
-            "import ostro from '@ostro/vite';",
-            '',
-            'export default defineConfig({',
-            '    plugins: [',
-            '        ostro({',
-            '            input: [',
-            "                'resources/assets/css/app.css',",
-            "                'resources/assets/js/app.js',",
-            '            ],',
-            '            refresh: true,',
-            '        }),',
-            '    ],',
-            '});',
-            ''
-        ].join('\n');
-        fs.writeFileSync(configPath, content, 'utf8');
-        try {
-            const tsViteConfig = path.join(directory, 'vite.config.ts');
-            if (fs.existsSync(tsViteConfig)) fs.unlinkSync(tsViteConfig);
-        } catch (_) { }
-        try {
-            const legacyMixTs = path.join(directory, 'webpack.mix.ts');
-            if (fs.existsSync(legacyMixTs)) fs.unlinkSync(legacyMixTs);
-        } catch (_) { }
-        try {
-            const legacyMixJs = path.join(directory, 'webpack.mix.js');
-            if (fs.existsSync(legacyMixJs)) fs.unlinkSync(legacyMixJs);
-        } catch (_) { }
+    public configureAssetPipeline(directory: string, format: 'js' | 'ts', builder: 'vite' | 'mix'): void {
+        const ext = format === 'js' ? 'js' : 'ts';
+        if (builder === 'mix') {
+            const mixPath: string = path.join(directory, `webpack.mix.${ext}`);
+            const content: string = [
+                "const mix = require('@ostro/mix');",
+                '',
+                '/*',
+                ' |--------------------------------------------------------------------------',
+                ' | Mix Asset Management',
+                ' |--------------------------------------------------------------------------',
+                ' |',
+                ' | Mix provides a clean, fluent API for defining Webpack build steps',
+                ' | for your OstroJS applications.',
+                ' |',
+                ' */',
+                '',
+                format === 'ts'
+                    ? "mix.ts('resources/assets/js/app.ts', 'public/js')"
+                    : "mix.js('resources/assets/js/app.js', 'public/js')",
+                "    .postCss('resources/assets/css/app.css', 'public/css', [",
+                '        //',
+                '    ]);',
+                ''
+            ].join('\n');
+            fs.writeFileSync(mixPath, content, 'utf8');
+
+            // Remove unused vite configs and redundant mix extension
+            const otherExt = format === 'js' ? 'ts' : 'js';
+            const redundantMix = path.join(directory, `webpack.mix.${otherExt}`);
+            const viteTs = path.join(directory, 'vite.config.ts');
+            const viteJs = path.join(directory, 'vite.config.js');
+            try { if (fs.existsSync(redundantMix)) fs.unlinkSync(redundantMix); } catch (_) {}
+            try { if (fs.existsSync(viteTs)) fs.unlinkSync(viteTs); } catch (_) {}
+            try { if (fs.existsSync(viteJs)) fs.unlinkSync(viteJs); } catch (_) {}
+        } else {
+            // Default: Vite
+            const vitePath: string = path.join(directory, `vite.config.${ext}`);
+            const scriptEntry = `resources/assets/js/app.${ext}`;
+            const content: string = [
+                "import { defineConfig } from 'vite';",
+                "import ostro from '@ostro/vite';",
+                '',
+                'export default defineConfig({',
+                '    plugins: [',
+                '        ostro({',
+                '            input: [',
+                "                'resources/assets/css/app.css',",
+                `                '${scriptEntry}',`,
+                '            ],',
+                '            refresh: true,',
+                '        }),',
+                '    ],',
+                '});',
+                ''
+            ].join('\n');
+            fs.writeFileSync(vitePath, content, 'utf8');
+
+            // Remove unused mix configs and redundant vite extension
+            const otherExt = format === 'js' ? 'ts' : 'js';
+            const redundantVite = path.join(directory, `vite.config.${otherExt}`);
+            const mixTs = path.join(directory, 'webpack.mix.ts');
+            const mixJs = path.join(directory, 'webpack.mix.js');
+            try { if (fs.existsSync(redundantVite)) fs.unlinkSync(redundantVite); } catch (_) {}
+            try { if (fs.existsSync(mixTs)) fs.unlinkSync(mixTs); } catch (_) {}
+            try { if (fs.existsSync(mixJs)) fs.unlinkSync(mixJs); } catch (_) {}
+        }
     }
 
     /**
@@ -761,11 +795,12 @@ class NewCommand extends Command {
     }
 
     /**
-     * Update package.json to reflect TypeScript linting and build configuration.
+     * Update package.json to reflect TypeScript linting, bundler, and build configuration.
      *
      * @param directory - Application root directory path.
+     * @param builder - Asset bundler ('vite' or 'mix').
      */
-    public updatePackageJsonForTypeScript(directory: string): void {
+    public updatePackageJsonForTypeScript(directory: string, builder: 'vite' | 'mix' = 'vite'): void {
         const pkgPath: string = path.join(directory, 'package.json');
         if (!fs.existsSync(pkgPath)) return;
         const pkg: any = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
@@ -773,13 +808,33 @@ class NewCommand extends Command {
             pkg.scripts['lint:check'] = 'eslint .';
             pkg.scripts['lint:fix'] = 'eslint . --fix';
             pkg.scripts['dev'] = 'npm run development';
-            pkg.scripts['development'] = 'vite build';
-            pkg.scripts['watch'] = 'vite build --watch';
-            pkg.scripts['watch-poll'] = 'vite build --watch';
-            pkg.scripts['vite'] = 'vite';
-            pkg.scripts['prod'] = 'npm run production';
-            pkg.scripts['production'] = 'vite build';
+            if (builder === 'mix') {
+                delete pkg.scripts['vite'];
+                pkg.scripts['development'] = 'mix --mix-config=webpack.mix.ts';
+                pkg.scripts['watch'] = 'mix watch --mix-config=webpack.mix.ts';
+                pkg.scripts['watch-poll'] = 'mix watch --mix-config=webpack.mix.ts -- --watch-options-poll=1000';
+                pkg.scripts['hot'] = 'mix watch --hot --mix-config=webpack.mix.ts';
+                pkg.scripts['prod'] = 'npm run production';
+                pkg.scripts['production'] = 'mix --production --mix-config=webpack.mix.ts';
+            } else {
+                delete pkg.scripts['hot'];
+                pkg.scripts['development'] = 'vite build';
+                pkg.scripts['watch'] = 'vite build --watch';
+                pkg.scripts['watch-poll'] = 'vite build --watch';
+                pkg.scripts['vite'] = 'vite';
+                pkg.scripts['prod'] = 'npm run production';
+                pkg.scripts['production'] = 'vite build';
+            }
             pkg.scripts['build'] = 'npm run lint:check && ostro-build';
+        }
+        if (builder === 'mix') {
+            if (pkg.devDependencies) {
+                delete pkg.devDependencies['@ostro/vite'];
+                delete pkg.devDependencies['vite'];
+                pkg.devDependencies['@ostro/mix'] = '^2.0.0-alpha.1';
+                pkg.devDependencies['webpack'] = '5.99.9';
+                pkg.devDependencies['ts-loader'] = '^9.5.2';
+            }
         }
         fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
     }
@@ -788,8 +843,9 @@ class NewCommand extends Command {
      * Update package.json to reflect pure JavaScript configuration.
      *
      * @param directory - Application root directory path.
+     * @param builder - Asset bundler ('vite' or 'mix').
      */
-    public updatePackageJsonForJavaScript(directory: string): void {
+    public updatePackageJsonForJavaScript(directory: string, builder: 'vite' | 'mix' = 'vite'): void {
         const pkgPath: string = path.join(directory, 'package.json');
         if (!fs.existsSync(pkgPath)) return;
         const pkg: any = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
@@ -803,12 +859,23 @@ class NewCommand extends Command {
             pkg.scripts['lint:check'] = 'eslint .';
             pkg.scripts['lint:fix'] = 'eslint . --fix';
             pkg.scripts['dev'] = 'npm run development';
-            pkg.scripts['development'] = 'vite build';
-            pkg.scripts['watch'] = 'vite build --watch';
-            pkg.scripts['watch-poll'] = 'vite build --watch';
-            pkg.scripts['vite'] = 'vite';
-            pkg.scripts['prod'] = 'npm run production';
-            pkg.scripts['production'] = 'vite build';
+            if (builder === 'mix') {
+                delete pkg.scripts['vite'];
+                pkg.scripts['development'] = 'mix --mix-config=webpack.mix.js';
+                pkg.scripts['watch'] = 'mix watch --mix-config=webpack.mix.js';
+                pkg.scripts['watch-poll'] = 'mix watch --mix-config=webpack.mix.js -- --watch-options-poll=1000';
+                pkg.scripts['hot'] = 'mix watch --hot --mix-config=webpack.mix.js';
+                pkg.scripts['prod'] = 'npm run production';
+                pkg.scripts['production'] = 'mix --production --mix-config=webpack.mix.js';
+            } else {
+                delete pkg.scripts['hot'];
+                pkg.scripts['development'] = 'vite build';
+                pkg.scripts['watch'] = 'vite build --watch';
+                pkg.scripts['watch-poll'] = 'vite build --watch';
+                pkg.scripts['vite'] = 'vite';
+                pkg.scripts['prod'] = 'npm run production';
+                pkg.scripts['production'] = 'vite build';
+            }
             pkg.scripts['build'] = 'npm run lint:check';
             pkg.scripts['server:start'] = 'node app.js';
         }
@@ -821,6 +888,12 @@ class NewCommand extends Command {
             delete pkg.devDependencies['@types/jest'];
             delete pkg.devDependencies['ts-jest'];
             delete pkg.devDependencies['ts-loader'];
+            if (builder === 'mix') {
+                delete pkg.devDependencies['@ostro/vite'];
+                delete pkg.devDependencies['vite'];
+                pkg.devDependencies['@ostro/mix'] = '^2.0.0-alpha.1';
+                pkg.devDependencies['webpack'] = '5.99.9';
+            }
             pkg.devDependencies.eslint = '^9.20.0';
         } else {
             pkg.devDependencies = { eslint: '^9.20.0' };
@@ -977,6 +1050,99 @@ class NewCommand extends Command {
             } catch (_) { }
         }
     }
+
+    /**
+     * Restore and ensure all .gitignore files (root, public, database, storage) in crafted application.
+     *
+     * @param directory - Application root directory path.
+     */
+    public ensureGitignoreFiles(directory: string): void {
+        if (!fs.existsSync(directory)) return;
+
+        // Convert any 'gitignore' files unpacked from tarball into '.gitignore'
+        const convertGitignores = (dir: string): void => {
+            if (!fs.existsSync(dir)) return;
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    convertGitignores(fullPath);
+                } else if (entry.name === 'gitignore') {
+                    const dotGitignore = path.join(dir, '.gitignore');
+                    if (!fs.existsSync(dotGitignore)) {
+                        fs.copyFileSync(fullPath, dotGitignore);
+                    }
+                    try { fs.unlinkSync(fullPath); } catch (_) { }
+                }
+            }
+        };
+        convertGitignores(directory);
+
+        // Ensure standard root .gitignore if missing
+        const rootGitignore = path.join(directory, '.gitignore');
+        if (!fs.existsSync(rootGitignore)) {
+            const defaultRoot = [
+                '*.log',
+                '.DS_Store',
+                '.env',
+                '.env.backup',
+                '/node_modules',
+                '/public/build',
+                '/public/hot',
+                '/public/storage',
+                '/storage/*.key',
+                '/storage/framework',
+                '/storage/logs/',
+                '/storage/app',
+                'Thumbs.db',
+                'npm-debug.log',
+                'yarn-error.log',
+                'package-lock.json',
+                '/.codex',
+                '/.cursor/',
+                '/.fleet',
+                '/.idea',
+                '/.nova',
+                '/.vscode',
+                '/.zed',
+                ''
+            ].join('\n');
+            fs.writeFileSync(rootGitignore, defaultRoot);
+        }
+
+        // Ensure database/.gitignore
+        const dbDir = path.join(directory, 'database');
+        if (fs.existsSync(dbDir)) {
+            const dbGitignore = path.join(dbDir, '.gitignore');
+            if (!fs.existsSync(dbGitignore)) {
+                fs.writeFileSync(dbGitignore, '*.sqlite*\n');
+            }
+        }
+
+        // Ensure storage/**/.gitignore files
+        const storageGitignores: Record<string, string> = {
+            'storage/app': '*\n!public/\n!.gitignore\n',
+            'storage/app/public': '*\n!.gitignore\n',
+            'storage/framework': 'compiled.json\nconfig.json\ndown\nevents.scanned.json\nmaintenance.json\nroutes.json\nroutes.scanned.json\nschedule-*\nservices.json\n',
+            'storage/framework/cache': '*\n!data/\n!.gitignore\n',
+            'storage/framework/cache/data': '*\n!.gitignore\n',
+            'storage/framework/sessions': '*\n!.gitignore\n',
+            'storage/framework/testing': '*\n!.gitignore\n',
+            'storage/framework/views': '*\n!.gitignore\n',
+            'storage/logs': '*\n!.gitignore\n',
+        };
+
+        for (const [relPath, content] of Object.entries(storageGitignores)) {
+            const targetDir = path.join(directory, relPath);
+            if (fs.existsSync(targetDir)) {
+                const gitignoreFile = path.join(targetDir, '.gitignore');
+                if (!fs.existsSync(gitignoreFile)) {
+                    fs.writeFileSync(gitignoreFile, content);
+                }
+            }
+        }
+    }
 }
+
 
 export default NewCommand;

@@ -54,4 +54,19 @@ describe('CLI Index Entry Point', () => {
         expect(console.error).toHaveBeenCalledWith(testErr);
         expect(process.exit).toHaveBeenCalledWith(1);
     });
+
+    test('handles case when commander command is not present in program.commands', async () => {
+        process.argv = ['node', 'index.js', '--help'];
+        const commander = require('commander');
+        jest.spyOn(commander.program.commands, 'find').mockReturnValue(undefined);
+
+        const _ConsoleApp = require('@ostro/console');
+        const ConsoleApplication = _ConsoleApp.default || _ConsoleApp;
+        jest.spyOn(ConsoleApplication.prototype, 'run').mockResolvedValue(0);
+
+        require('../src/index');
+        await new Promise(process.nextTick);
+
+        expect(process.exit).toHaveBeenCalledWith(0);
+    });
 });

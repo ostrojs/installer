@@ -6,7 +6,9 @@
  */
 
 import ConsoleApplication from '@ostro/console';
+import { program } from 'commander';
 import NewCommand from './newCommand';
+import AssistantCommand from './assistantCommand';
 
 /**
  * Initialize the Ostro Console Application instance.
@@ -17,6 +19,15 @@ const $app: ConsoleApplication = new ConsoleApplication();
  * Register available CLI commands.
  */
 $app.add(new NewCommand());
+
+const assistantCmd = new AssistantCommand();
+$app.add(assistantCmd);
+
+// Allow arbitrary subcommands and options forwarded to local project assistant
+const cmd = program.commands.find((c: any): boolean => c.name() === 'assistant');
+if (cmd) {
+    cmd.allowUnknownOption();
+}
 
 /**
  * Parse CLI arguments and execute the matching command.
